@@ -9,6 +9,30 @@ import wx
 print('plugin: ablation')
 
 
+def in_sphere(point, center, radius):
+	point = numpy.asarray(point)
+	assert point.ndim == 1
+	center = numpy.asarray(center)
+	assert center.shape == point.shape
+	assert radius >= 0
+	distance = numpy.linalg.norm(point - center)
+	return distance < radius
+
+def in_cylinder(point, center1, center2, radius):
+	point = numpy.asarray(point)
+	assert point.ndim == 1
+	center1 = numpy.asarray(center1)
+	assert center1.shape == point.shape
+	center2 = numpy.asarray(center2)
+	assert center2.shape == point.shape
+	assert radius >= 0
+	center12 = center2 - center1
+	t = numpy.dot(point - center1, center12) / numpy.power(numpy.linalg.norm(center12), 2)
+	projection = center1 + t * center12
+	distance = numpy.linalg.norm(point - projection)
+	return t >= 0 and t < 1 and distance < radius
+
+
 class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 
 	@staticmethod
@@ -129,12 +153,26 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			delete_button.Bind(wx.EVT_BUTTON, handler)
 			self.items_sizer.Add(delete_button, flag=wx.ALIGN_CENTER_VERTICAL)
 			# draw image
+			"""
 			for t in numpy.linspace(0, 1):
-				coords = numpy.average([entry_xyz, target_xyz], 0, [t, 1-t])
-				opts = self.displayCtx.getOpts(self.image)
-				xformed = opts.transformCoords([coords], 'world', 'voxel', True)[0]
-				xformed = tuple(xformed.astype(int))
-				self.image[xformed] = index + 1
+				point_xyz = numpy.average([entry_xyz, target_xyz], 0, [1-t, t])
+				point_ijk = self.world2voxel(point_xyz)
+				self.image[point_ijk] = index + 1
+			"""
+			entry_ijk = self.world2voxel(entry_xyz)
+			print('entry', entry_xyz, entry_ijk)
+			target_ijk = self.world2voxel(target_xyz)
+			print('target', target_xyz, target_ijk)
+			# TODO check self.image.xyzUnits
+			mask = numpy.zeros(self.image.shape, dtype=bool)
+			for point_ijk in self.box([entry_ijk, target_ijk], 4):
+				point_xyz = self.voxel2world(point_ijk)
+				mask[point_ijk] = any([
+					in_cylinder(point_xyz, entry_xyz, target_xyz, 2),
+					in_sphere(point_xyz, entry_xyz, 4),
+					in_sphere(point_xyz, target_xyz, 4),
+				])
+			self.image[mask] = index + 1
 
 	def on_new_button_click(self, event):
 		print('new')
@@ -208,6 +246,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 	def on_submit_button_click(self, event):
 		print('submit')
 		assert self.image is not None and self.image in self.overlayList
+		# TODO check that entry != target
 		if self.item_index is None:
 			self.instance.append((self.entry_xyz, self.target_xyz))
 		else:
@@ -233,6 +272,41 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			self.reset()
 		else:
 			self.image = image
+
+	def world2voxel(self, coords):
+		assert self.image is not None
+		coords = numpy.asarray(coords)
+		assert coords.ndim == 1 and coords.size == self.image.ndim
+		opts = self.displayCtx.getOpts(self.image)
+		coords = [coords]
+		xformed = opts.transformCoords(coords, 'world', 'voxel', True)
+		xformed = xformed[0]
+		return tuple(xformed.astype(int))
+
+	def voxel2world(self, coords):
+		assert self.image is not None
+		coords = numpy.asarray(coords)
+		assert coords.ndim == 1 and coords.size == self.image.ndim
+		opts = self.displayCtx.getOpts(self.image)
+		coords = [coords]
+		xformed = opts.transformCoords(coords, 'voxel', 'world')
+		xformed = xformed[0]
+		return tuple(xformed)
+
+	def box(self, points, distance):
+		assert self.image is not None
+		points = numpy.asarray(points)
+		assert points.ndim == 2 and points.shape[1] == self.image.ndim
+		assert numpy.issubdtype(points.dtype, numpy.integer)
+		assert distance >= 0
+		margin = distance * numpy.asarray(self.image.pixdim)
+		margin = margin.round().astype(int)
+		lower = numpy.amin(points, axis=0) - margin
+		lower = numpy.maximum(lower, 0)
+		upper = numpy.amax(points, axis=0) + margin + 1
+		upper = numpy.minimum(upper, self.image.shape)
+		for offset in numpy.ndindex(tuple(upper - lower)):
+			yield tuple(lower + offset)
 
 	def on_overlay_list_changed(self, *args):
 		if self.image is None:
