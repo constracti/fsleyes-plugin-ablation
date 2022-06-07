@@ -9,6 +9,7 @@ import wx
 print('plugin: ablation')
 
 
+"""
 def in_sphere(point, center, radius):
 	point = numpy.asarray(point)
 	assert point.ndim == 1
@@ -31,6 +32,7 @@ def in_cylinder(point, center1, center2, radius):
 	projection = center1 + t * center12
 	distance = numpy.linalg.norm(point - projection)
 	return t >= 0 and t < 1 and distance < radius
+"""
 
 
 class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
@@ -153,11 +155,17 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			delete_button.Bind(wx.EVT_BUTTON, handler)
 			self.items_sizer.Add(delete_button, flag=wx.ALIGN_CENTER_VERTICAL)
 			# draw image
-			"""
-			for t in numpy.linspace(0, 1):
+			mask = numpy.zeros(self.image.shape, dtype=bool)
+			print('entry', entry_xyz)
+			print('target', target_xyz)
+			vector_xyz = numpy.asarray(target_xyz) - numpy.asarray(entry_xyz)
+			num = numpy.dot(numpy.abs(vector_xyz), numpy.reciprocal(self.image.pixdim)).round().astype(int)
+			print('count', num)
+			for t in numpy.linspace(0, 1, num):
 				point_xyz = numpy.average([entry_xyz, target_xyz], 0, [1-t, t])
 				point_ijk = self.world2voxel(point_xyz)
-				self.image[point_ijk] = index + 1
+				mask[point_ijk] = True
+			self.image[mask] = index + 1
 			"""
 			entry_ijk = self.world2voxel(entry_xyz)
 			print('entry', entry_xyz, entry_ijk)
@@ -173,6 +181,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 					in_sphere(point_xyz, target_xyz, 4),
 				])
 			self.image[mask] = index + 1
+			"""
 
 	def on_new_button_click(self, event):
 		print('new')
@@ -293,6 +302,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		xformed = xformed[0]
 		return tuple(xformed)
 
+	"""
 	def box(self, points, distance):
 		assert self.image is not None
 		points = numpy.asarray(points)
@@ -307,6 +317,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		upper = numpy.minimum(upper, self.image.shape)
 		for offset in numpy.ndindex(tuple(upper - lower)):
 			yield tuple(lower + offset)
+	"""
 
 	def on_overlay_list_changed(self, *args):
 		if self.image is None:
