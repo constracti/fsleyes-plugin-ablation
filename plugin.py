@@ -49,64 +49,93 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			self.on_overlay_list_changed,
 			immediate=True,
 		)
-		# home sizer
-		self.home_sizer = wx.BoxSizer(wx.VERTICAL)
-		self.SetSizer(self.home_sizer)
-		self.home_sizer.AddSpacer(4)
-		# new button
-		self.new_button = wx.Button(self, label='new file')
-		self.new_button.Bind(wx.EVT_BUTTON, self.on_new_button_click)
-		self.home_sizer.Add(self.new_button, flag=wx.ALIGN_CENTER)
-		# instance sizer
-		self.instance_sizer = wx.BoxSizer(wx.VERTICAL)
-		self.home_sizer.Add(self.instance_sizer, flag=wx.EXPAND)
-		# items group
-		self.items_group = wx.StaticBoxSizer(wx.VERTICAL, self, 'items')
-		self.instance_sizer.Add(self.items_group, flag=wx.EXPAND)
-		self.instance_sizer.AddSpacer(4)
-		# items sizer
-		self.items_sizer = wx.FlexGridSizer(4, 4, 4)
-		self.items_sizer.SetFlexibleDirection(wx.HORIZONTAL)
-		self.items_group.AddSpacer(4)
-		self.items_group.Add(self.items_sizer)
-		self.items_group.AddSpacer(4)
-		# insert button
-		self.insert_button = wx.Button(self, label='insert')
-		self.insert_button.Bind(wx.EVT_BUTTON, self.on_insert_button_click)
-		self.instance_sizer.Add(self.insert_button, flag=wx.ALIGN_CENTER)
-		# item group
-		self.item_group = wx.StaticBoxSizer(wx.VERTICAL, self)
-		self.instance_sizer.Add(self.item_group, flag=wx.EXPAND)
-		self.item_group.AddSpacer(4)
-		item_box = self.item_group.GetStaticBox()
-		# entry button
-		self.entry_button = wx.Button(item_box, label='set entry')
-		self.entry_button.Bind(wx.EVT_BUTTON, self.on_entry_button_click)
-		self.item_group.Add(self.entry_button, flag=wx.ALIGN_CENTER)
-		self.item_group.AddSpacer(4)
-		# target button
-		self.target_button = wx.Button(item_box, label='set target')
-		self.target_button.Bind(wx.EVT_BUTTON, self.on_target_button_click)
-		self.item_group.Add(self.target_button, flag=wx.ALIGN_CENTER)
-		self.item_group.AddSpacer(4)
-		# submit button
-		self.submit_button = wx.Button(item_box, label='submit')
-		self.submit_button.Bind(wx.EVT_BUTTON, self.on_submit_button_click)
-		self.item_group.Add(self.submit_button, flag=wx.ALIGN_CENTER)
-		self.item_group.AddSpacer(4)
-		# cancel button
-		self.cancel_button = wx.Button(item_box, label='cancel')
-		self.cancel_button.Bind(wx.EVT_BUTTON, self.on_cancel_button_click)
-		self.item_group.Add(self.cancel_button, flag=wx.ALIGN_CENTER)
-		self.item_group.AddSpacer(4)
-		# close button
-		self.close_button = wx.Button(self, label='close file')
-		self.close_button.Bind(wx.EVT_BUTTON, self.on_close_button_click)
-		self.instance_sizer.AddSpacer(4)
-		self.instance_sizer.Add(self.close_button, flag=wx.ALIGN_CENTER)
-		self.home_sizer.AddSpacer(4)
-		# reset
+		container_sizer = wx.BoxSizer(wx.HORIZONTAL)
+		self.SetSizer(container_sizer)
+		container_sizer.AddSpacer(4)
+		home_sizer = wx.BoxSizer(wx.VERTICAL)
+		home_sizer.AddSpacer(4)
+		self._init_start_items(home_sizer)
+		self._init_instance_items(home_sizer)
+		self._init_form_items(home_sizer)
+		container_sizer.Add(home_sizer, 1)
+		container_sizer.AddSpacer(4)
 		self.reset()
+
+	def _init_start_items(self, home_sizer):
+		self.start_items = []
+		# open sizer
+		open_sizer = wx.BoxSizer(wx.HORIZONTAL)
+		new_button = wx.Button(self, label='new file')
+		new_button.Bind(wx.EVT_BUTTON, self.on_new_button_click)
+		open_sizer.Add(new_button)
+		open_sizer.Add(4, 0, 1)
+		load_button = wx.Button(self, label='load file')
+		open_sizer.Add(load_button)
+		self.start_items.append(home_sizer.Add(open_sizer, flag=wx.EXPAND))
+		self.start_items.append(home_sizer.AddSpacer(4))
+
+	def _init_instance_items(self, home_sizer):
+		self.instance_items = []
+		# close sizer
+		close_sizer = wx.BoxSizer(wx.HORIZONTAL)
+		save_button = wx.Button(self, label='save file')
+		close_sizer.Add(save_button)
+		close_sizer.Add(4, 0, 1)
+		close_button = wx.Button(self, label='close file')
+		close_button.Bind(wx.EVT_BUTTON, self.on_close_button_click)
+		close_sizer.Add(close_button)
+		self.instance_items.append(home_sizer.Add(close_sizer, flag=wx.EXPAND))
+		self.instance_items.append(home_sizer.AddSpacer(4))
+		# items line
+		self.instance_items.append(home_sizer.Add(wx.StaticLine(self)))
+		self.instance_items.append(home_sizer.AddSpacer(4))
+		# items text
+		self.instance_items.append(home_sizer.Add(wx.StaticText(self, label='items')))
+		self.instance_items.append(home_sizer.AddSpacer(4))
+		# items sizer
+		items_sizer = wx.FlexGridSizer(4, 4, 4)
+		items_sizer.SetFlexibleDirection(wx.HORIZONTAL)
+		self.instance_items.append(home_sizer.Add(items_sizer))
+		self.items_sizer = items_sizer
+		self.instance_items.append(home_sizer.AddSpacer(4))
+		# insert button
+		insert_button = wx.Button(self, label='insert')
+		insert_button.Bind(wx.EVT_BUTTON, self.on_insert_button_click)
+		self.instance_items.append(home_sizer.Add(insert_button, flag=wx.ALIGN_CENTER))
+		self.instance_items.append(home_sizer.AddSpacer(4))
+
+	def _init_form_items(self, home_sizer):
+		self.form_items = []
+		# form line
+		self.form_items.append(home_sizer.Add(wx.StaticLine(self)))
+		self.form_items.append(home_sizer.AddSpacer(4))
+		# form text
+		form_text = wx.StaticText(self, label='item')
+		self.form_items.append(home_sizer.Add(form_text))
+		self.form_text = form_text
+		self.form_items.append(home_sizer.AddSpacer(4))
+		# entry button
+		entry_button = wx.Button(self, label='set entry')
+		entry_button.Bind(wx.EVT_BUTTON, self.on_entry_button_click)
+		self.form_items.append(home_sizer.Add(entry_button, flag=wx.ALIGN_CENTER))
+		self.form_items.append(home_sizer.AddSpacer(4))
+		# target button
+		target_button = wx.Button(self, label='set target')
+		target_button.Bind(wx.EVT_BUTTON, self.on_target_button_click)
+		self.form_items.append(home_sizer.Add(target_button, flag=wx.ALIGN_CENTER))
+		self.form_items.append(home_sizer.AddSpacer(4))
+		# submit sizer
+		submit_sizer = wx.BoxSizer(wx.HORIZONTAL)
+		submit_button = wx.Button(self, label='submit')
+		submit_button.Bind(wx.EVT_BUTTON, self.on_submit_button_click)
+		submit_sizer.Add(submit_button)
+		self.submit_button = submit_button
+		submit_sizer.Add(4, 0, 1)
+		cancel_button = wx.Button(self, label='cancel')
+		cancel_button.Bind(wx.EVT_BUTTON, self.on_cancel_button_click)
+		submit_sizer.Add(cancel_button)
+		self.form_items.append(home_sizer.Add(submit_sizer, flag=wx.EXPAND))
+		self.form_items.append(home_sizer.AddSpacer(4))
 
 	def destroy(self):
 		self.overlayList.removeListener('overlays', self.name)
@@ -115,10 +144,12 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 	def reset(self):
 		self.image = None
 		self.instance = None
-		self.home_sizer.Show(self.new_button)
-		self.home_sizer.Hide(self.instance_sizer)
+		for item in self.start_items:
+			item.Show(True)
+		for item in self.instance_items + self.form_items:
+			item.Show(False)
 		self.build_items()
-		self.home_sizer.Layout()
+		self.GetSizer().Layout()
 
 	def build_items(self):
 		self.items_sizer.Clear(True)
@@ -127,30 +158,29 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		# wipe image
 		self.image[:] = numpy.zeros(self.image.shape)
 		# loop items
-		items_box = self.items_group.GetStaticBox()
 		for index, (entry_xyz, target_xyz) in enumerate(self.instance):
 			# index text
 			self.items_sizer.Add(wx.StaticText(
-				items_box,
+				self,
 				label='#{:d}'.format(index + 1),
 			), flag=wx.ALIGN_RIGHT|wx.ALIGN_CENTER_VERTICAL)
 			# coordinates
 			sizer = wx.FlexGridSizer(3, 1, 1)
 			for x in entry_xyz + target_xyz:
 				sizer.Add(wx.TextCtrl(
-					items_box,
+					self,
 					value='{:d}'.format(round(x)),
 					size=wx.Size(30, 24),
 					style=wx.TE_READONLY|wx.TE_RIGHT,
 				))
 			self.items_sizer.Add(sizer)
 			# update button
-			update_button = wx.Button(items_box, label='update')
+			update_button = wx.Button(self, label='update')
 			handler = lambda e, i=index: self.on_update_button_click(e, i)
 			update_button.Bind(wx.EVT_BUTTON, handler)
 			self.items_sizer.Add(update_button, flag=wx.ALIGN_CENTER_VERTICAL)
 			# delete button
-			delete_button = wx.Button(items_box, label='delete')
+			delete_button = wx.Button(self, label='delete')
 			handler = lambda e, i=index: self.on_delete_button_click(e, i)
 			delete_button.Bind(wx.EVT_BUTTON, handler)
 			self.items_sizer.Add(delete_button, flag=wx.ALIGN_CENTER_VERTICAL)
@@ -208,73 +238,78 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		self.overlayList.append(self.image)
 		self.displayCtx.selectOverlay(self.image)
 		self.instance = []
-		self.home_sizer.Hide(self.new_button)
-		self.home_sizer.Show(self.instance_sizer)
-		self.instance_sizer.Hide(self.item_group)
-		self.home_sizer.Layout()
+		for item in self.start_items:
+			item.Show(False)
+		for item in self.instance_items:
+			item.Show(True)
+		self.GetSizer().Layout()
 
 	def on_insert_button_click(self, event):
 		print('insert')
-		assert self.image is not None and self.image in self.overlayList
+		assert self.image is not None
 		self.item_index = None
 		self.entry_xyz, self.target_xyz = None, None
-		self.instance_sizer.Show(self.item_group)
-		self.item_group.GetStaticBox().SetLabelText('insert item')
-		self.home_sizer.Layout()
+		for item in self.form_items:
+			item.Show(True)
+		self.form_text.SetLabelText('insert item')
+		self.GetSizer().Layout()
 		self.submit_button.Enable(self.entry_xyz is not None and self.target_xyz is not None)
 
 	def on_update_button_click(self, event, index):
 		print('update')
-		assert self.image is not None and self.image in self.overlayList
+		assert self.image is not None
 		self.item_index = index
 		self.entry_xyz, self.target_xyz = self.instance[index]
-		self.instance_sizer.Show(self.item_group)
-		self.item_group.GetStaticBox().SetLabelText('update item #{:d}'.format(index + 1))
-		self.home_sizer.Layout()
+		for item in self.form_items:
+			item.Show(True)
+		self.form_text.SetLabelText('update item #{:d}'.format(index + 1))
+		self.GetSizer().Layout()
 		self.submit_button.Enable(self.entry_xyz is not None and self.target_xyz is not None)
 
 	def on_delete_button_click(self, event, index):
 		print('delete')
-		assert self.image is not None and self.image in self.overlayList
+		assert self.image is not None
 		self.instance.pop(index)
 		self.build_items()
-		self.home_sizer.Layout()
+		for item in self.form_items:
+			item.Show(False)
+		self.GetSizer().Layout()
 
 	def on_entry_button_click(self, event):
 		print('entry')
-		assert self.image is not None and self.image in self.overlayList
+		assert self.image is not None
 		self.entry_xyz = tuple(self.displayCtx.worldLocation.xyz)
 		self.submit_button.Enable(self.entry_xyz is not None and self.target_xyz is not None)
 
 	def on_target_button_click(self, event):
 		print('target')
-		assert self.image is not None and self.image in self.overlayList
+		assert self.image is not None
 		self.target_xyz = tuple(self.displayCtx.worldLocation.xyz)
 		self.submit_button.Enable(self.entry_xyz is not None and self.target_xyz is not None)
 
 	def on_submit_button_click(self, event):
 		print('submit')
-		assert self.image is not None and self.image in self.overlayList
+		assert self.image is not None
 		# TODO check that entry != target
 		if self.item_index is None:
 			self.instance.append((self.entry_xyz, self.target_xyz))
 		else:
 			self.instance[self.item_index] = (self.entry_xyz, self.target_xyz)
 		self.build_items()
-		self.instance_sizer.Show(self.insert_button)
-		self.instance_sizer.Hide(self.item_group)
-		self.home_sizer.Layout()
+		for item in self.form_items:
+			item.Show(False)
+		self.GetSizer().Layout()
 
 	def on_cancel_button_click(self, event):
 		print('cancel')
-		assert self.image is not None and self.image in self.overlayList
-		self.instance_sizer.Show(self.insert_button)
-		self.instance_sizer.Hide(self.item_group)
-		self.home_sizer.Layout()
+		assert self.image is not None
+		for item in self.form_items:
+			item.Show(False)
+		self.GetSizer().Layout()
 
 	def on_close_button_click(self, event):
 		print('close')
-		assert self.image is not None and self.image in self.overlayList
+		assert self.image is not None
 		image = self.image
 		self.image = None
 		if fsleyes.actions.removeoverlay.removeOverlay(self.overlayList, self.displayCtx, image):
