@@ -56,7 +56,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			immediate=True,
 		)
 		container_sizer = wx.BoxSizer(wx.HORIZONTAL)
-		container_sizer.SetMinSize(200, 0)
+		container_sizer.SetMinSize(208, 0)
 		self.SetSizer(container_sizer)
 		container_sizer.AddSpacer(4)
 		home_sizer = wx.BoxSizer(wx.VERTICAL)
@@ -123,13 +123,17 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		self.form_text = form_text
 		self.form_items.append(home_sizer.AddSpacer(4))
 		# pair sizer
-		pair_sizer = wx.FlexGridSizer(3, 4, 4)
+		pair_sizer = wx.FlexGridSizer(4, 4, 4)
 		pair_sizer.SetFlexibleDirection(wx.HORIZONTAL)
 		self.form_items.append(home_sizer.Add(pair_sizer))
 		self.form_items.append(home_sizer.AddSpacer(4))
 		# pair sizer head
 		pair_sizer.Add(
 			wx.StaticText(self, label='point'),
+			flag=wx.ALIGN_LEFT|wx.ALIGN_CENTER_VERTICAL,
+		)
+		pair_sizer.Add(
+			wx.StaticText(self, label='coordinates'),
 			flag=wx.ALIGN_LEFT|wx.ALIGN_CENTER_VERTICAL,
 		)
 		pair_sizer.Add(
@@ -142,6 +146,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		)
 		# pair sizer body
 		self.form = {
+			'coords_text': [],
 			'view_button': [],
 		}
 		mark_bitmap = fsleyes.icons.loadBitmap('floppydisk16')
@@ -152,6 +157,19 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 				wx.StaticText(self, label=which),
 				flag=wx.ALIGN_LEFT|wx.ALIGN_CENTER_VERTICAL,
 			)
+			# coordinates
+			sizer = wx.FlexGridSizer(3, 1, 1)
+			text_ctrl_list = []
+			for x in range(sizer.GetCols()):
+				text_ctrl = wx.TextCtrl(
+					self,
+					size=wx.Size(30, 24),
+					style=wx.TE_READONLY|wx.TE_RIGHT,
+				)
+				sizer.Add(text_ctrl)
+				text_ctrl_list.append(text_ctrl)
+			pair_sizer.Add(sizer)
+			self.form['coords_text'].append(text_ctrl_list)
 			# mark button
 			bitmap_button = wx.BitmapButton(self, bitmap=mark_bitmap)
 			handler = lambda e, w=w: self.on_mark_button_click(e, w)
@@ -169,6 +187,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 				flag=wx.ALIGN_CENTER_HORIZONTAL|wx.ALIGN_CENTER_VERTICAL,
 			)
 			self.form['view_button'].append(bitmap_button)
+		self.form['coords_text'] = tuple(self.form['coords_text'])
 		self.form['view_button'] = tuple(self.form['view_button'])
 		# submit sizer
 		submit_sizer = wx.BoxSizer(wx.HORIZONTAL)
@@ -203,9 +222,15 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		if build:
 			self._build_items()
 		if self.instance is not None and self.item_index is not None:
-			self.submit_button.Enable(all(point_xyz is not None for point_xyz in self.form['point_xyz']))
-			for point_xyz, view_button in zip(self.form['point_xyz'], self.form['view_button']):
+			for point_xyz, coords_text, view_button in zip(self.form['point_xyz'], self.form['coords_text'], self.form['view_button']):
 				view_button.Enable(point_xyz is not None)
+				if point_xyz is not None:
+					values = ['{:.0f}'.format(v) for v in point_xyz]
+				else:
+					values = [''] * len(coords_text)
+				for v, text_ctrl in zip(values, coords_text):
+					text_ctrl.SetValue(v)
+			self.submit_button.Enable(all(point_xyz is not None for point_xyz in self.form['point_xyz']))
 		self.GetSizer().Layout()
 
 	def _build_items(self):
@@ -229,7 +254,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			for x in entry_xyz + target_xyz:
 				sizer.Add(wx.TextCtrl(
 					self,
-					value='{:d}'.format(round(x)),
+					value='{:.0f}'.format(x),
 					size=wx.Size(30, 24),
 					style=wx.TE_READONLY|wx.TE_RIGHT,
 				))
@@ -256,22 +281,6 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 				point_ijk = self.world2voxel(point_xyz)
 				mask[point_ijk] = True
 			image[mask] = index + 1
-			"""
-			entry_ijk = self.world2voxel(entry_xyz)
-			print('entry', entry_xyz, entry_ijk)
-			target_ijk = self.world2voxel(target_xyz)
-			print('target', target_xyz, target_ijk)
-			# TODO check image.xyzUnits
-			mask = numpy.zeros(image.shape, dtype=bool)
-			for point_ijk in self.box([entry_ijk, target_ijk], 4):
-				point_xyz = self.voxel2world(point_ijk)
-				mask[point_ijk] = any([
-					in_cylinder(point_xyz, entry_xyz, target_xyz, 2),
-					in_sphere(point_xyz, entry_xyz, 4),
-					in_sphere(point_xyz, target_xyz, 4),
-				])
-			image[mask] = index + 1
-			"""
 
 	def on_new_button_click(self, event):
 		print('new')
@@ -400,24 +409,6 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		xformed = opts.transformCoords(coords, 'voxel', 'world')
 		xformed = xformed[0]
 		return tuple(xformed)
-
-	"""
-	def box(self, points, distance):
-		assert self.instance is not None
-		image = self.instance['image']
-		points = numpy.asarray(points)
-		assert points.ndim == 2 and points.shape[1] == image.ndim
-		assert numpy.issubdtype(points.dtype, numpy.integer)
-		assert distance >= 0
-		margin = distance * numpy.asarray(image.pixdim)
-		margin = margin.round().astype(int)
-		lower = numpy.amin(points, axis=0) - margin
-		lower = numpy.maximum(lower, 0)
-		upper = numpy.amax(points, axis=0) + margin + 1
-		upper = numpy.minimum(upper, image.shape)
-		for offset in numpy.ndindex(tuple(upper - lower)):
-			yield tuple(lower + offset)
-	"""
 
 	def on_overlay_list_changed(self, *args):
 		if self.instance is None:
