@@ -10,6 +10,12 @@ print('plugin: ablation')
 
 
 """
+print(fsleyes.icons.getIconDir())
+/usr/local/fsl/fslpython/envs/fslpython/lib/python3.7/site-packages/fsleyes/assets/icons
+"""
+
+
+"""
 def in_sphere(point, center, radius):
 	point = numpy.asarray(point)
 	assert point.ndim == 1
@@ -50,6 +56,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			immediate=True,
 		)
 		container_sizer = wx.BoxSizer(wx.HORIZONTAL)
+		container_sizer.SetMinSize(200, 0)
 		self.SetSizer(container_sizer)
 		container_sizer.AddSpacer(4)
 		home_sizer = wx.BoxSizer(wx.VERTICAL)
@@ -102,6 +109,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		insert_button = wx.Button(self, label='insert')
 		insert_button.Bind(wx.EVT_BUTTON, self.on_insert_button_click)
 		self.instance_items.append(home_sizer.Add(insert_button, flag=wx.ALIGN_CENTER))
+		self.insert_button = insert_button
 		self.instance_items.append(home_sizer.AddSpacer(4))
 
 	def _init_form_items(self, home_sizer):
@@ -114,16 +122,54 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		self.form_items.append(home_sizer.Add(form_text))
 		self.form_text = form_text
 		self.form_items.append(home_sizer.AddSpacer(4))
-		# entry button
-		entry_button = wx.Button(self, label='set entry')
-		entry_button.Bind(wx.EVT_BUTTON, self.on_entry_button_click)
-		self.form_items.append(home_sizer.Add(entry_button, flag=wx.ALIGN_CENTER))
+		# pair sizer
+		pair_sizer = wx.FlexGridSizer(3, 4, 4)
+		pair_sizer.SetFlexibleDirection(wx.HORIZONTAL)
+		self.form_items.append(home_sizer.Add(pair_sizer))
 		self.form_items.append(home_sizer.AddSpacer(4))
-		# target button
-		target_button = wx.Button(self, label='set target')
-		target_button.Bind(wx.EVT_BUTTON, self.on_target_button_click)
-		self.form_items.append(home_sizer.Add(target_button, flag=wx.ALIGN_CENTER))
-		self.form_items.append(home_sizer.AddSpacer(4))
+		# pair sizer head
+		pair_sizer.Add(
+			wx.StaticText(self, label='point'),
+			flag=wx.ALIGN_LEFT|wx.ALIGN_CENTER_VERTICAL,
+		)
+		pair_sizer.Add(
+			wx.StaticText(self, label='mark'),
+			flag=wx.ALIGN_CENTER_HORIZONTAL|wx.ALIGN_CENTER_VERTICAL,
+		)
+		pair_sizer.Add(
+			wx.StaticText(self, label='view'),
+			flag=wx.ALIGN_CENTER_HORIZONTAL|wx.ALIGN_CENTER_VERTICAL,
+		)
+		# pair sizer body
+		self.form = {
+			'view_button': [],
+		}
+		mark_bitmap = fsleyes.icons.loadBitmap('floppydisk16')
+		view_bitmap = fsleyes.icons.loadBitmap('eye16')
+		for w, which in enumerate(['entry', 'target']):
+			# which text
+			pair_sizer.Add(
+				wx.StaticText(self, label=which),
+				flag=wx.ALIGN_LEFT|wx.ALIGN_CENTER_VERTICAL,
+			)
+			# mark button
+			bitmap_button = wx.BitmapButton(self, bitmap=mark_bitmap)
+			handler = lambda e, w=w: self.on_mark_button_click(e, w)
+			bitmap_button.Bind(wx.EVT_BUTTON, handler)
+			pair_sizer.Add(
+				bitmap_button,
+				flag=wx.ALIGN_CENTER_HORIZONTAL|wx.ALIGN_CENTER_VERTICAL,
+			)
+			# view button
+			bitmap_button = wx.BitmapButton(self, bitmap=view_bitmap)
+			handler = lambda e, w=w: self.on_view_button_click(e, w)
+			bitmap_button.Bind(wx.EVT_BUTTON, handler)
+			pair_sizer.Add(
+				bitmap_button,
+				flag=wx.ALIGN_CENTER_HORIZONTAL|wx.ALIGN_CENTER_VERTICAL,
+			)
+			self.form['view_button'].append(bitmap_button)
+		self.form['view_button'] = tuple(self.form['view_button'])
 		# submit sizer
 		submit_sizer = wx.BoxSizer(wx.HORIZONTAL)
 		submit_button = wx.Button(self, label='submit')
@@ -142,23 +188,37 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		super().destroy()
 
 	def reset(self):
-		self.image = None
 		self.instance = None
+		self.refresh(True)
+
+	def refresh(self, build=False):
 		for item in self.start_items:
-			item.Show(True)
-		for item in self.instance_items + self.form_items:
-			item.Show(False)
-		self.build_items()
+			item.Show(self.instance is None)
+		for item in self.instance_items:
+			item.Show(self.instance is not None)
+		for item in self.form_items:
+			item.Show(self.instance is not None and self.item_index is not None)
+		if self.instance is not None:
+			self.insert_button.Enable(len(self.instance['items']) < 5)
+		if build:
+			self._build_items()
+		if self.instance is not None and self.item_index is not None:
+			self.submit_button.Enable(all(point_xyz is not None for point_xyz in self.form['point_xyz']))
+			for point_xyz, view_button in zip(self.form['point_xyz'], self.form['view_button']):
+				view_button.Enable(point_xyz is not None)
 		self.GetSizer().Layout()
 
-	def build_items(self):
+	def _build_items(self):
 		self.items_sizer.Clear(True)
 		if self.instance is None:
 			return
+		image = self.instance['image']
 		# wipe image
-		self.image[:] = numpy.zeros(self.image.shape)
+		image[:] = numpy.zeros(image.shape)
+		update_bitmap = fsleyes.icons.loadBitmap('pencil24')
+		delete_bitmap = fsleyes.icons.loadBitmap('eraser24')
 		# loop items
-		for index, (entry_xyz, target_xyz) in enumerate(self.instance):
+		for index, (entry_xyz, target_xyz) in enumerate(self.instance['items']):
 			# index text
 			self.items_sizer.Add(wx.StaticText(
 				self,
@@ -175,34 +235,34 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 				))
 			self.items_sizer.Add(sizer)
 			# update button
-			update_button = wx.Button(self, label='update')
+			update_button = wx.BitmapButton(self, bitmap=update_bitmap)
 			handler = lambda e, i=index: self.on_update_button_click(e, i)
 			update_button.Bind(wx.EVT_BUTTON, handler)
 			self.items_sizer.Add(update_button, flag=wx.ALIGN_CENTER_VERTICAL)
 			# delete button
-			delete_button = wx.Button(self, label='delete')
+			delete_button = wx.BitmapButton(self, bitmap=delete_bitmap)
 			handler = lambda e, i=index: self.on_delete_button_click(e, i)
 			delete_button.Bind(wx.EVT_BUTTON, handler)
 			self.items_sizer.Add(delete_button, flag=wx.ALIGN_CENTER_VERTICAL)
 			# draw image
-			mask = numpy.zeros(self.image.shape, dtype=bool)
+			mask = numpy.zeros(image.shape, dtype=bool)
 			print('entry', entry_xyz)
 			print('target', target_xyz)
 			vector_xyz = numpy.asarray(target_xyz) - numpy.asarray(entry_xyz)
-			num = numpy.dot(numpy.abs(vector_xyz), numpy.reciprocal(self.image.pixdim)).round().astype(int)
+			num = numpy.dot(numpy.abs(vector_xyz), numpy.reciprocal(image.pixdim)).round().astype(int)
 			print('count', num)
 			for t in numpy.linspace(0, 1, num):
 				point_xyz = numpy.average([entry_xyz, target_xyz], 0, [1-t, t])
 				point_ijk = self.world2voxel(point_xyz)
 				mask[point_ijk] = True
-			self.image[mask] = index + 1
+			image[mask] = index + 1
 			"""
 			entry_ijk = self.world2voxel(entry_xyz)
 			print('entry', entry_xyz, entry_ijk)
 			target_ijk = self.world2voxel(target_xyz)
 			print('target', target_xyz, target_ijk)
-			# TODO check self.image.xyzUnits
-			mask = numpy.zeros(self.image.shape, dtype=bool)
+			# TODO check image.xyzUnits
+			mask = numpy.zeros(image.shape, dtype=bool)
 			for point_ijk in self.box([entry_ijk, target_ijk], 4):
 				point_xyz = self.voxel2world(point_ijk)
 				mask[point_ijk] = any([
@@ -210,23 +270,23 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 					in_sphere(point_xyz, entry_xyz, 4),
 					in_sphere(point_xyz, target_xyz, 4),
 				])
-			self.image[mask] = index + 1
+			image[mask] = index + 1
 			"""
 
 	def on_new_button_click(self, event):
 		print('new')
-		assert self.image is None
+		assert self.instance is None
 		overlay = self.displayCtx.getSelectedOverlay()
 		if overlay is None:
 			wx.MessageBox(
 				'An overlay should be selected.',
-				'Select an overlay.',
+				self.title(),
 				wx.OK | wx.ICON_INFORMATION,
 			)
 			return
 		nibimage = overlay.nibImage
 		xyzt_units = nibimage.header.get_xyzt_units()
-		self.image = fsleyes.actions.newimage.newImage(
+		image = fsleyes.actions.newimage.newImage(
 			nibimage.shape,
 			nibimage.header.get_zooms(),
 			int,
@@ -235,103 +295,107 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			xyzt_units[1],
 			name='{:s}-ablation'.format(overlay.name),
 		)
-		self.overlayList.append(self.image)
-		self.displayCtx.selectOverlay(self.image)
-		self.instance = []
-		for item in self.start_items:
-			item.Show(False)
-		for item in self.instance_items:
-			item.Show(True)
-		self.GetSizer().Layout()
+		self.overlayList.append(image)
+		self.displayCtx.selectOverlay(image)
+		self.instance = {
+			'image': image,
+			'items': [],
+		}
+		self.item_index = None
+		self.refresh()
 
 	def on_insert_button_click(self, event):
 		print('insert')
-		assert self.image is not None
-		self.item_index = None
-		self.entry_xyz, self.target_xyz = None, None
-		for item in self.form_items:
-			item.Show(True)
+		assert self.instance is not None
+		self.item_index = -1
+		self.form['point_xyz'] = [None, None]
 		self.form_text.SetLabelText('insert item')
-		self.GetSizer().Layout()
-		self.submit_button.Enable(self.entry_xyz is not None and self.target_xyz is not None)
+		self.refresh()
 
 	def on_update_button_click(self, event, index):
-		print('update')
-		assert self.image is not None
+		print('update', index)
+		assert self.instance is not None
 		self.item_index = index
-		self.entry_xyz, self.target_xyz = self.instance[index]
-		for item in self.form_items:
-			item.Show(True)
+		self.form['point_xyz'] = list(self.instance['items'][index])
 		self.form_text.SetLabelText('update item #{:d}'.format(index + 1))
-		self.GetSizer().Layout()
-		self.submit_button.Enable(self.entry_xyz is not None and self.target_xyz is not None)
+		self.refresh()
 
 	def on_delete_button_click(self, event, index):
-		print('delete')
-		assert self.image is not None
-		self.instance.pop(index)
-		self.build_items()
-		for item in self.form_items:
-			item.Show(False)
-		self.GetSizer().Layout()
+		print('delete', index)
+		assert self.instance is not None
+		self.instance['items'].pop(index)
+		self.refresh(True)
 
-	def on_entry_button_click(self, event):
-		print('entry')
-		assert self.image is not None
-		self.entry_xyz = tuple(self.displayCtx.worldLocation.xyz)
-		self.submit_button.Enable(self.entry_xyz is not None and self.target_xyz is not None)
+	def on_mark_button_click(self, event, which):
+		print('mark', which)
+		assert self.instance is not None
+		assert self.item_index is not None
+		assert which in [0, 1]
+		self.form['point_xyz'][which] = tuple(self.displayCtx.worldLocation.xyz)
+		self.refresh()
 
-	def on_target_button_click(self, event):
-		print('target')
-		assert self.image is not None
-		self.target_xyz = tuple(self.displayCtx.worldLocation.xyz)
-		self.submit_button.Enable(self.entry_xyz is not None and self.target_xyz is not None)
+	def on_view_button_click(self, event, which):
+		print('view', which)
+		assert self.instance is not None
+		assert self.item_index is not None
+		assert which in [0, 1]
+		assert self.form['point_xyz'][which] is not None
+		self.displayCtx.worldLocation.xyz = self.form['point_xyz'][which]
 
 	def on_submit_button_click(self, event):
 		print('submit')
-		assert self.image is not None
-		# TODO check that entry != target
-		if self.item_index is None:
-			self.instance.append((self.entry_xyz, self.target_xyz))
+		assert self.instance is not None
+		assert self.item_index is not None
+		entry_xyz, target_xyz = tuple(self.form['point_xyz'])
+		assert entry_xyz is not None and target_xyz is not None
+		if numpy.allclose(entry_xyz, target_xyz):
+			wx.MessageBox(
+				'Entry and target points should differ.',
+				self.title(),
+				wx.OK | wx.ICON_INFORMATION,
+			)
+			return
+		if self.item_index >= 0:
+			self.instance['items'][self.item_index] = (entry_xyz, target_xyz)
 		else:
-			self.instance[self.item_index] = (self.entry_xyz, self.target_xyz)
-		self.build_items()
-		for item in self.form_items:
-			item.Show(False)
-		self.GetSizer().Layout()
+			self.instance['items'].append((entry_xyz, target_xyz))
+		self.item_index = None
+		self.refresh(True)
 
 	def on_cancel_button_click(self, event):
 		print('cancel')
-		assert self.image is not None
-		for item in self.form_items:
-			item.Show(False)
-		self.GetSizer().Layout()
+		assert self.instance is not None
+		assert self.item_index is not None
+		self.item_index = None
+		self.refresh()
 
 	def on_close_button_click(self, event):
 		print('close')
-		assert self.image is not None
-		image = self.image
-		self.image = None
-		if fsleyes.actions.removeoverlay.removeOverlay(self.overlayList, self.displayCtx, image):
+		assert self.instance is not None
+		instance = self.instance
+		self.instance = None
+		if fsleyes.actions.removeoverlay.removeOverlay(self.overlayList, self.displayCtx, instance['image']):
 			self.reset()
 		else:
-			self.image = image
+			self.instance = instance
 
 	def world2voxel(self, coords):
-		assert self.image is not None
+		assert self.instance is not None
+		image = self.instance['image']
 		coords = numpy.asarray(coords)
-		assert coords.ndim == 1 and coords.size == self.image.ndim
-		opts = self.displayCtx.getOpts(self.image)
+		assert coords.ndim == 1 and coords.size == image.ndim
+		opts = self.displayCtx.getOpts(image)
 		coords = [coords]
 		xformed = opts.transformCoords(coords, 'world', 'voxel', True)
 		xformed = xformed[0]
 		return tuple(xformed.astype(int))
 
 	def voxel2world(self, coords):
-		assert self.image is not None
+		assert self.instance is not None
+		image = self.instance['image']
 		coords = numpy.asarray(coords)
-		assert coords.ndim == 1 and coords.size == self.image.ndim
-		opts = self.displayCtx.getOpts(self.image)
+		assert coords.ndim == 1 and coords.size == image.ndim
+		opts = self.displayCtx.getOpts(image)
 		coords = [coords]
 		xformed = opts.transformCoords(coords, 'voxel', 'world')
 		xformed = xformed[0]
@@ -339,25 +403,26 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 
 	"""
 	def box(self, points, distance):
-		assert self.image is not None
+		assert self.instance is not None
+		image = self.instance['image']
 		points = numpy.asarray(points)
-		assert points.ndim == 2 and points.shape[1] == self.image.ndim
+		assert points.ndim == 2 and points.shape[1] == image.ndim
 		assert numpy.issubdtype(points.dtype, numpy.integer)
 		assert distance >= 0
-		margin = distance * numpy.asarray(self.image.pixdim)
+		margin = distance * numpy.asarray(image.pixdim)
 		margin = margin.round().astype(int)
 		lower = numpy.amin(points, axis=0) - margin
 		lower = numpy.maximum(lower, 0)
 		upper = numpy.amax(points, axis=0) + margin + 1
-		upper = numpy.minimum(upper, self.image.shape)
+		upper = numpy.minimum(upper, image.shape)
 		for offset in numpy.ndindex(tuple(upper - lower)):
 			yield tuple(lower + offset)
 	"""
 
 	def on_overlay_list_changed(self, *args):
-		if self.image is None:
+		if self.instance is None:
 			return
-		if self.image in self.overlayList:
+		if self.instance['image'] in self.overlayList:
 			return
 		print('ablation image has been removed from the overlay list')
 		self.reset()
