@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 
 
+import json
 import fsleyes
 import numpy
 import wx
@@ -15,30 +16,7 @@ print(fsleyes.icons.getIconDir())
 """
 
 
-"""
-def in_sphere(point, center, radius):
-	point = numpy.asarray(point)
-	assert point.ndim == 1
-	center = numpy.asarray(center)
-	assert center.shape == point.shape
-	assert radius >= 0
-	distance = numpy.linalg.norm(point - center)
-	return distance < radius
-
-def in_cylinder(point, center1, center2, radius):
-	point = numpy.asarray(point)
-	assert point.ndim == 1
-	center1 = numpy.asarray(center1)
-	assert center1.shape == point.shape
-	center2 = numpy.asarray(center2)
-	assert center2.shape == point.shape
-	assert radius >= 0
-	center12 = center2 - center1
-	t = numpy.dot(point - center1, center12) / numpy.power(numpy.linalg.norm(center12), 2)
-	projection = center1 + t * center12
-	distance = numpy.linalg.norm(point - projection)
-	return t >= 0 and t < 1 and distance < radius
-"""
+MAX_ITEMS = 5
 
 
 class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
@@ -73,10 +51,13 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		# open sizer
 		open_sizer = wx.BoxSizer(wx.HORIZONTAL)
 		new_button = wx.Button(self, label='new file')
-		new_button.Bind(wx.EVT_BUTTON, self.on_new_button_click)
+		handler = lambda event, load=False: self.on_load_button_click(event, load)
+		new_button.Bind(wx.EVT_BUTTON, handler)
 		open_sizer.Add(new_button)
 		open_sizer.Add(4, 0, 1)
 		load_button = wx.Button(self, label='load file')
+		handler = lambda event, load=True: self.on_load_button_click(event, load)
+		load_button.Bind(wx.EVT_BUTTON, handler)
 		open_sizer.Add(load_button)
 		self.start_items.append(home_sizer.Add(open_sizer, flag=wx.EXPAND))
 		self.start_items.append(home_sizer.AddSpacer(4))
@@ -86,6 +67,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		# close sizer
 		close_sizer = wx.BoxSizer(wx.HORIZONTAL)
 		save_button = wx.Button(self, label='save file')
+		save_button.Bind(wx.EVT_BUTTON, self.on_save_button_click)
 		close_sizer.Add(save_button)
 		close_sizer.Add(4, 0, 1)
 		close_button = wx.Button(self, label='close file')
@@ -218,7 +200,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		for item in self.form_items:
 			item.Show(self.instance is not None and self.item_index is not None)
 		if self.instance is not None:
-			self.insert_button.Enable(len(self.instance['items']) < 5)
+			self.insert_button.Enable(len(self.instance['items']) < MAX_ITEMS)
 		if build:
 			self._build_items()
 		if self.instance is not None and self.item_index is not None:
@@ -282,8 +264,8 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 				mask[point_ijk] = True
 			image[mask] = index + 1
 
-	def on_new_button_click(self, event):
-		print('new')
+	def on_load_button_click(self, event, load):
+		print('load' if load else 'new')
 		assert self.instance is None
 		overlay = self.displayCtx.getSelectedOverlay()
 		if overlay is None:
@@ -293,6 +275,45 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 				wx.OK | wx.ICON_INFORMATION,
 			)
 			return
+		path = None
+		items = []
+		if load:
+			with wx.FileDialog(self, self.title(), wildcard='JSON files (.json)|*.json', style=wx.FD_OPEN|wx.FD_FILE_MUST_EXIST) as file_dialog:
+				if file_dialog.ShowModal() == wx.ID_CANCEL:
+					return
+				path = file_dialog.GetPath()
+				try:
+					with open(path, 'r') as fp:
+						items = json.load(fp)
+					assert type(items) is list and len(items) <= MAX_ITEMS
+					for item in items:
+						assert type(item) is list and len(item) == 2
+						for point_xyz in item:
+							assert type(point_xyz) is list and len(point_xyz) == 3
+							for value in point_xyz:
+								assert type(value) is float
+					items = [tuple(tuple(point_xyz) for point_xyz in item) for item in items]
+				except IOError as error:
+					wx.MessageBox(
+						str(error),
+						self.title(),
+						wx.OK | wx.ICON_ERROR,
+					)
+					return
+				except json.JSONDecodeError as error:
+					wx.MessageBox(
+						str(error),
+						self.title(),
+						wx.OK | wx.ICON_ERROR,
+					)
+					return
+				except AssertionError:
+					wx.MessageBox(
+						'Input file should have compatible content.',
+						self.title(),
+						wx.OK | wx.ICON_ERROR,
+					)
+					return
 		nibimage = overlay.nibImage
 		xyzt_units = nibimage.header.get_xyzt_units()
 		image = fsleyes.actions.newimage.newImage(
@@ -307,11 +328,12 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		self.overlayList.append(image)
 		self.displayCtx.selectOverlay(image)
 		self.instance = {
+			'path': path,
 			'image': image,
-			'items': [],
+			'items': items,
 		}
 		self.item_index = None
-		self.refresh()
+		self.refresh(True)
 
 	def on_insert_button_click(self, event):
 		print('insert')
@@ -377,6 +399,26 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		assert self.item_index is not None
 		self.item_index = None
 		self.refresh()
+
+	def on_save_button_click(self, event):
+		print('save')
+		assert self.instance is not None
+		with wx.FileDialog(self, self.title(), wildcard='JSON files (.json)|*.json', style=wx.FD_SAVE|wx.FD_OVERWRITE_PROMPT) as file_dialog:
+			if self.instance['path'] is not None:
+				file_dialog.SetPath(self.instance['path'])
+			if file_dialog.ShowModal() == wx.ID_CANCEL:
+				return
+			path = file_dialog.GetPath()
+			try:
+				with open(path, 'w') as fp:
+					json.dump(self.instance['items'], fp, indent="\t")
+			except IOError as error:
+				wx.MessageBox(
+					str(error),
+					self.title(),
+					wx.OK | wx.ICON_ERROR,
+				)
+				return
 
 	def on_close_button_click(self, event):
 		print('close')
