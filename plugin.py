@@ -171,6 +171,13 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			self.form['view_button'].append(bitmap_button)
 		self.form['coords_text'] = tuple(self.form['coords_text'])
 		self.form['view_button'] = tuple(self.form['view_button'])
+		# pair slider
+		pair_slider = wx.Slider(self)
+		pair_slider.Bind(wx.EVT_SCROLL_THUMBTRACK, self.on_pair_slider_scroll)
+		pair_slider.Bind(wx.EVT_SCROLL_CHANGED, self.on_pair_slider_scroll)
+		self.form_items.append(home_sizer.Add(pair_slider, flag=wx.EXPAND))
+		self.pair_slider = pair_slider
+		self.form_items.append(home_sizer.AddSpacer(4))
 		# submit sizer
 		submit_sizer = wx.BoxSizer(wx.HORIZONTAL)
 		submit_button = wx.Button(self, label='submit')
@@ -212,7 +219,9 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 					values = [''] * len(coords_text)
 				for v, text_ctrl in zip(values, coords_text):
 					text_ctrl.SetValue(v)
-			self.submit_button.Enable(all(point_xyz is not None for point_xyz in self.form['point_xyz']))
+			enable = all(point_xyz is not None for point_xyz in self.form['point_xyz'])
+			self.submit_button.Enable(enable)
+			self.pair_slider.Enable(enable)
 		self.GetSizer().Layout()
 
 	def _build_items(self):
@@ -371,7 +380,22 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		assert self.item_index is not None
 		assert which in [0, 1]
 		assert self.form['point_xyz'][which] is not None
+		if which == 0:
+			self.pair_slider.SetValue(self.pair_slider.GetMin())
+		else:
+			self.pair_slider.SetValue(self.pair_slider.GetMax())
 		self.displayCtx.worldLocation.xyz = self.form['point_xyz'][which]
+
+	def on_pair_slider_scroll(self, event):
+		print('pair', event.GetEventType(), event.GetPosition())
+		assert self.instance is not None
+		assert self.item_index is not None
+		entry_xyz, target_xyz = tuple(self.form['point_xyz'])
+		assert entry_xyz is not None and target_xyz is not None
+		slider = self.pair_slider
+		t = (slider.GetValue() - slider.GetMin()) / (slider.GetMax() - slider.GetMin())
+		point_xyz = numpy.average([entry_xyz, target_xyz], 0, [1-t, t])
+		self.displayCtx.worldLocation.xyz = tuple(point_xyz)
 
 	def on_submit_button_click(self, event):
 		print('submit')
