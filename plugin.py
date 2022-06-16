@@ -25,7 +25,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			immediate=True,
 		)
 		container_sizer = wx.BoxSizer(wx.HORIZONTAL)
-		container_sizer.SetMinSize(208, 0)
+		container_sizer.SetMinSize(225, 0)
 		self.SetSizer(container_sizer)
 		container_sizer.AddSpacer(4)
 		home_sizer = wx.BoxSizer(wx.VERTICAL)
@@ -124,7 +124,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		}
 		mark_bitmap = fsleyes.icons.loadBitmap('floppydisk16')
 		view_bitmap = fsleyes.icons.loadBitmap('eye16')
-		for w, which in enumerate(['entry', 'target']):
+		for which in ['entry', 'target']:
 			# which text
 			pair_sizer.Add(
 				wx.StaticText(self, label=which),
@@ -145,7 +145,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			self.form['coords_text'].append(text_ctrl_list)
 			# mark button
 			bitmap_button = wx.BitmapButton(self, bitmap=mark_bitmap)
-			handler = lambda e, w=w: self.on_mark_button_click(e, w)
+			handler = lambda event, which=which: self.on_mark_button_click(event, which)
 			bitmap_button.Bind(wx.EVT_BUTTON, handler)
 			pair_sizer.Add(
 				bitmap_button,
@@ -153,7 +153,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			)
 			# view button
 			bitmap_button = wx.BitmapButton(self, bitmap=view_bitmap)
-			handler = lambda e, w=w: self.on_view_button_click(e, w)
+			handler = lambda event, which=which: self.on_view_button_click(event, 0, which)
 			bitmap_button.Bind(wx.EVT_BUTTON, handler)
 			pair_sizer.Add(
 				bitmap_button,
@@ -213,6 +213,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		self.items_sizer.Clear(True)
 		self.instance['update_button'] = []
 		self.instance['delete_button'] = []
+		view_bitmap = fsleyes.icons.loadBitmap('eye16')
 		update_bitmap = fsleyes.icons.loadBitmap('pencil24')
 		delete_bitmap = fsleyes.icons.loadBitmap('eraser24')
 		for i, (entry_xyz, target_xyz) in enumerate(self.instance['items']):
@@ -223,24 +224,33 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 				label='#{:d}'.format(index),
 			), flag=wx.ALIGN_RIGHT|wx.ALIGN_CENTER_VERTICAL)
 			# coordinates
-			sizer = wx.FlexGridSizer(3, 1, 1)
-			for x in entry_xyz + target_xyz:
-				sizer.Add(wx.TextCtrl(
-					self,
-					value='{:.0f}'.format(x),
-					size=wx.Size(30, 24),
-					style=wx.TE_READONLY|wx.TE_RIGHT,
-				))
+			sizer = wx.FlexGridSizer(4, 1, 1)
+			coords_dict = {
+				'entry': entry_xyz,
+				'target': target_xyz,
+			}
+			for which, point_xyz in coords_dict.items():
+				for value in point_xyz:
+					sizer.Add(wx.TextCtrl(
+						self,
+						value='{:.0f}'.format(value),
+						size=wx.Size(30, 24),
+						style=wx.TE_READONLY|wx.TE_RIGHT,
+					), flag=wx.ALIGN_CENTER_VERTICAL)
+				view_button = wx.BitmapButton(self, bitmap=view_bitmap)
+				handler = lambda event, index=index, which=which: self.on_view_button_click(event, index, which)
+				view_button.Bind(wx.EVT_BUTTON, handler)
+				sizer.Add(view_button, flag=wx.ALIGN_CENTER_VERTICAL)
 			self.items_sizer.Add(sizer)
 			# update button
 			update_button = wx.BitmapButton(self, bitmap=update_bitmap)
-			handler = lambda e, i=index: self.on_update_button_click(e, i)
+			handler = lambda event, index=index: self.on_update_button_click(event, index)
 			update_button.Bind(wx.EVT_BUTTON, handler)
 			self.items_sizer.Add(update_button, flag=wx.ALIGN_CENTER_VERTICAL)
 			self.instance['update_button'].append(update_button)
 			# delete button
 			delete_button = wx.BitmapButton(self, bitmap=delete_bitmap)
-			handler = lambda e, i=index: self.on_delete_button_click(e, i)
+			handler = lambda event, index=index: self.on_delete_button_click(event, index)
 			delete_button.Bind(wx.EVT_BUTTON, handler)
 			self.items_sizer.Add(delete_button, flag=wx.ALIGN_CENTER_VERTICAL)
 			self.instance['delete_button'].append(delete_button)
@@ -475,29 +485,43 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		print('mark', which)
 		assert self.instance is not None
 		assert self.index is not None
-		assert which in [0, 1]
-		self.form['point_xyz'][which] = tuple(self.displayCtx.worldLocation.xyz)
+		if which == 'entry':
+			self.form['point_xyz'][0] = tuple(self.displayCtx.worldLocation.xyz)
+			self.pair_slider.SetValue(self.pair_slider.GetMin())
+		elif which == 'target':
+			self.form['point_xyz'][1] = tuple(self.displayCtx.worldLocation.xyz)
+			self.pair_slider.SetValue(self.pair_slider.GetMax())
+		else:
+			assert False
 		if all(point_xyz is not None for point_xyz in self.form['point_xyz']):
 			self.instance['form_is_dirty'] = True
-		if which == 0:
-			self.pair_slider.SetValue(self.pair_slider.GetMin())
-		else:
-			self.pair_slider.SetValue(self.pair_slider.GetMax())
 		self.form_refresh()
 		if self.instance['form_is_dirty']:
 			self.draw()
 
-	def on_view_button_click(self, event, which):
-		print('view', which)
+	def on_view_button_click(self, event, index, which):
+		print('view', index, which)
 		assert self.instance is not None
-		assert self.index is not None
-		assert which in [0, 1]
-		assert self.form['point_xyz'][which] is not None
-		self.displayCtx.worldLocation.xyz = self.form['point_xyz'][which]
-		if which == 0:
-			self.pair_slider.SetValue(self.pair_slider.GetMin())
+		if index == 0:
+			assert self.index is not None
+			if which == 'entry':
+				assert self.form['point_xyz'][0] is not None
+				self.displayCtx.worldLocation.xyz = self.form['point_xyz'][0]
+				self.pair_slider.SetValue(self.pair_slider.GetMin())
+			elif which == 'target':
+				assert self.form['point_xyz'][1] is not None
+				self.displayCtx.worldLocation.xyz = self.form['point_xyz'][1]
+				self.pair_slider.SetValue(self.pair_slider.GetMax())
+			else:
+				assert False
 		else:
-			self.pair_slider.SetValue(self.pair_slider.GetMax())
+			assert index - 1 in range(len(self.instance['items']))
+			if which == 'entry':
+				self.displayCtx.worldLocation.xyz = self.instance['items'][index - 1][0]
+			elif which == 'target':
+				self.displayCtx.worldLocation.xyz = self.instance['items'][index - 1][1]
+			else:
+				assert False
 
 	def on_pair_slider_scroll(self, event):
 		print('pair', event.GetEventType(), event.GetPosition())
