@@ -10,15 +10,6 @@ import wx
 print('plugin: ablation')
 
 
-"""
-print(fsleyes.icons.getIconDir())
-/usr/local/fsl/fslpython/envs/fslpython/lib/python3.7/site-packages/fsleyes/assets/icons
-"""
-
-
-MAX_ITEMS = 5
-
-
 class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 
 	@staticmethod
@@ -195,50 +186,41 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		self.overlayList.removeListener('overlays', self.name)
 		super().destroy()
 
-	def reset(self):
-		self.instance = None
-		self.refresh(True)
-
-	def refresh(self, build=False):
+	def start_show(self):
+		assert self.instance is None
 		for item in self.start_items:
-			item.Show(self.instance is None)
-		for item in self.instance_items:
-			item.Show(self.instance is not None)
-		for item in self.form_items:
-			item.Show(self.instance is not None and self.item_index is not None)
-		if self.instance is not None:
-			self.insert_button.Enable(len(self.instance['items']) < MAX_ITEMS)
-		if build:
-			self._build_items()
-		if self.instance is not None and self.item_index is not None:
-			for point_xyz, coords_text, view_button in zip(self.form['point_xyz'], self.form['coords_text'], self.form['view_button']):
-				view_button.Enable(point_xyz is not None)
-				if point_xyz is not None:
-					values = ['{:.0f}'.format(v) for v in point_xyz]
-				else:
-					values = [''] * len(coords_text)
-				for v, text_ctrl in zip(values, coords_text):
-					text_ctrl.SetValue(v)
-			enable = all(point_xyz is not None for point_xyz in self.form['point_xyz'])
-			self.submit_button.Enable(enable)
-			self.pair_slider.Enable(enable)
-		self.GetSizer().Layout()
+			item.Show(True)
 
-	def _build_items(self):
+	def start_hide(self):
+		assert self.instance is not None
+		for item in self.start_items:
+			item.Show(False)
+
+	def instance_show(self):
+		assert self.instance is not None
+		for item in self.instance_items:
+			item.Show(True)
+		self.instance_refresh()
+
+	def instance_hide(self):
+		assert self.instance is None
+		for item in self.instance_items:
+			item.Show(False)
 		self.items_sizer.Clear(True)
-		if self.instance is None:
-			return
-		image = self.instance['image']
-		# wipe image
-		image[:] = numpy.zeros(image.shape)
+
+	def instance_refresh(self):
+		assert self.instance is not None
+		self.items_sizer.Clear(True)
+		self.instance['update_button'] = []
+		self.instance['delete_button'] = []
 		update_bitmap = fsleyes.icons.loadBitmap('pencil24')
 		delete_bitmap = fsleyes.icons.loadBitmap('eraser24')
-		# loop items
-		for index, (entry_xyz, target_xyz) in enumerate(self.instance['items']):
+		for i, (entry_xyz, target_xyz) in enumerate(self.instance['items']):
+			index = i + 1
 			# index text
 			self.items_sizer.Add(wx.StaticText(
 				self,
-				label='#{:d}'.format(index + 1),
+				label='#{:d}'.format(index),
 			), flag=wx.ALIGN_RIGHT|wx.ALIGN_CENTER_VERTICAL)
 			# coordinates
 			sizer = wx.FlexGridSizer(3, 1, 1)
@@ -255,23 +237,104 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			handler = lambda e, i=index: self.on_update_button_click(e, i)
 			update_button.Bind(wx.EVT_BUTTON, handler)
 			self.items_sizer.Add(update_button, flag=wx.ALIGN_CENTER_VERTICAL)
+			self.instance['update_button'].append(update_button)
 			# delete button
 			delete_button = wx.BitmapButton(self, bitmap=delete_bitmap)
 			handler = lambda e, i=index: self.on_delete_button_click(e, i)
 			delete_button.Bind(wx.EVT_BUTTON, handler)
 			self.items_sizer.Add(delete_button, flag=wx.ALIGN_CENTER_VERTICAL)
-			# draw image
-			mask = numpy.zeros(image.shape, dtype=bool)
-			print('entry', entry_xyz)
-			print('target', target_xyz)
-			vector_xyz = numpy.asarray(target_xyz) - numpy.asarray(entry_xyz)
-			num = numpy.dot(numpy.abs(vector_xyz), numpy.reciprocal(image.pixdim)).round().astype(int)
-			print('count', num)
-			for t in numpy.linspace(0, 1, num):
-				point_xyz = numpy.average([entry_xyz, target_xyz], 0, [1-t, t])
-				point_ijk = self.world2voxel(point_xyz)
-				mask[point_ijk] = True
-			image[mask] = index + 1
+			self.instance['delete_button'].append(delete_button)
+
+	def instance_enable(self):
+		assert self.instance is not None
+		assert self.index is None
+		self.insert_button.Enable()
+		for update_button in self.instance['update_button']:
+			update_button.Enable()
+		for delete_button in self.instance['delete_button']:
+			delete_button.Enable()
+
+	def instance_disable(self):
+		assert self.instance is not None
+		assert self.index is not None
+		self.insert_button.Disable()
+		for update_button in self.instance['update_button']:
+			update_button.Disable()
+		for delete_button in self.instance['delete_button']:
+			delete_button.Disable()
+
+	def form_show(self):
+		assert self.instance is not None
+		assert self.index is not None
+		for item in self.form_items:
+			item.Show(True)
+		if self.index > 0:
+			self.form_text.SetLabelText('update item #{:d}'.format(self.index))
+		else:
+			self.form_text.SetLabelText('insert item')
+		self.form_refresh()
+
+	def form_hide(self):
+		assert self.instance is None or self.index is None
+		for item in self.form_items:
+			item.Show(False)
+		self.form_text.SetLabelText('')
+
+	def form_refresh(self):
+		assert self.instance is not None
+		assert self.index is not None
+		for point_xyz, coords_text, view_button in zip(self.form['point_xyz'], self.form['coords_text'], self.form['view_button']):
+			if point_xyz is not None:
+				values = ['{:.0f}'.format(v) for v in point_xyz]
+			else:
+				values = [''] * len(coords_text)
+			for v, text_ctrl in zip(values, coords_text):
+				text_ctrl.SetValue(v)
+			view_button.Enable(point_xyz is not None)
+		enable = all(point_xyz is not None for point_xyz in self.form['point_xyz'])
+		self.submit_button.Enable(enable)
+		self.pair_slider.Enable(enable)
+
+	def layout(self):
+		self.GetSizer().Layout()
+
+	def draw(self):
+		assert self.instance is not None
+		image = self.instance['image']
+		data = numpy.zeros(image.shape, dtype=int)
+		for i, (entry_xyz, target_xyz) in enumerate(self.instance['items']):
+			index = i + 1
+			mask = self.pair2mask(entry_xyz, target_xyz) # 40ms/loop
+			data[mask] = index
+		if self.index is not None:
+			entry_xyz, target_xyz = tuple(self.form['point_xyz'])
+			if entry_xyz is not None and target_xyz is not None:
+				index = len(self.instance['items']) + 1
+				mask = self.pair2mask(entry_xyz, target_xyz) # 40ms
+				data[mask] = index
+		image[:] = data[:] # 270ms
+
+	def pair2mask(self, entry_xyz, target_xyz):
+		assert self.instance is not None
+		image = self.instance['image']
+		mask = numpy.zeros(image.shape, dtype=bool)
+		vector_xyz = numpy.asarray(target_xyz) - numpy.asarray(entry_xyz)
+		num = numpy.dot(numpy.abs(vector_xyz), numpy.reciprocal(image.pixdim)).round().astype(int)
+		print('entry', entry_xyz)
+		print('target', target_xyz)
+		print('count', num)
+		for t in numpy.linspace(0, 1, num):
+			point_xyz = numpy.average([entry_xyz, target_xyz], 0, [1-t, t])
+			point_ijk = self.world2voxel(point_xyz)
+			mask[point_ijk] = True
+		return mask
+
+	def reset(self):
+		self.instance = None
+		self.start_show()
+		self.instance_hide()
+		self.form_hide()
+		self.layout()
 
 	def on_load_button_click(self, event, load):
 		print('load' if load else 'new')
@@ -294,7 +357,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 				try:
 					with open(path, 'r') as fp:
 						items = json.load(fp)
-					assert type(items) is list and len(items) <= MAX_ITEMS
+					assert type(items) is list
 					for item in items:
 						assert type(item) is list and len(item) == 2
 						for point_xyz in item:
@@ -340,89 +403,13 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			'path': path,
 			'image': image,
 			'items': items,
+			'form_is_dirty': False,
 		}
-		self.item_index = None
-		self.refresh(True)
-
-	def on_insert_button_click(self, event):
-		print('insert')
-		assert self.instance is not None
-		self.item_index = -1
-		self.form['point_xyz'] = [None, None]
-		self.form_text.SetLabelText('insert item')
-		self.refresh()
-
-	def on_update_button_click(self, event, index):
-		print('update', index)
-		assert self.instance is not None
-		self.item_index = index
-		self.form['point_xyz'] = list(self.instance['items'][index])
-		self.form_text.SetLabelText('update item #{:d}'.format(index + 1))
-		self.refresh()
-
-	def on_delete_button_click(self, event, index):
-		print('delete', index)
-		assert self.instance is not None
-		self.instance['items'].pop(index)
-		self.refresh(True)
-
-	def on_mark_button_click(self, event, which):
-		print('mark', which)
-		assert self.instance is not None
-		assert self.item_index is not None
-		assert which in [0, 1]
-		self.form['point_xyz'][which] = tuple(self.displayCtx.worldLocation.xyz)
-		self.refresh()
-
-	def on_view_button_click(self, event, which):
-		print('view', which)
-		assert self.instance is not None
-		assert self.item_index is not None
-		assert which in [0, 1]
-		assert self.form['point_xyz'][which] is not None
-		if which == 0:
-			self.pair_slider.SetValue(self.pair_slider.GetMin())
-		else:
-			self.pair_slider.SetValue(self.pair_slider.GetMax())
-		self.displayCtx.worldLocation.xyz = self.form['point_xyz'][which]
-
-	def on_pair_slider_scroll(self, event):
-		print('pair', event.GetEventType(), event.GetPosition())
-		assert self.instance is not None
-		assert self.item_index is not None
-		entry_xyz, target_xyz = tuple(self.form['point_xyz'])
-		assert entry_xyz is not None and target_xyz is not None
-		slider = self.pair_slider
-		t = (slider.GetValue() - slider.GetMin()) / (slider.GetMax() - slider.GetMin())
-		point_xyz = numpy.average([entry_xyz, target_xyz], 0, [1-t, t])
-		self.displayCtx.worldLocation.xyz = tuple(point_xyz)
-
-	def on_submit_button_click(self, event):
-		print('submit')
-		assert self.instance is not None
-		assert self.item_index is not None
-		entry_xyz, target_xyz = tuple(self.form['point_xyz'])
-		assert entry_xyz is not None and target_xyz is not None
-		if numpy.allclose(entry_xyz, target_xyz):
-			wx.MessageBox(
-				'Entry and target points should differ.',
-				self.title(),
-				wx.OK | wx.ICON_INFORMATION,
-			)
-			return
-		if self.item_index >= 0:
-			self.instance['items'][self.item_index] = (entry_xyz, target_xyz)
-		else:
-			self.instance['items'].append((entry_xyz, target_xyz))
-		self.item_index = None
-		self.refresh(True)
-
-	def on_cancel_button_click(self, event):
-		print('cancel')
-		assert self.instance is not None
-		assert self.item_index is not None
-		self.item_index = None
-		self.refresh()
+		self.index = None
+		self.start_hide()
+		self.instance_show()
+		self.layout()
+		self.draw()
 
 	def on_save_button_click(self, event):
 		print('save')
@@ -443,6 +430,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 					wx.OK | wx.ICON_ERROR,
 				)
 				return
+			# TODO success message
 
 	def on_close_button_click(self, event):
 		print('close')
@@ -453,6 +441,110 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			self.reset()
 		else:
 			self.instance = instance
+
+	def on_insert_button_click(self, event):
+		print('insert')
+		assert self.instance is not None
+		assert self.index is None
+		self.index = 0
+		self.form['point_xyz'] = [None, None]
+		self.instance_disable()
+		self.form_show()
+		self.layout()
+
+	def on_update_button_click(self, event, index):
+		print('update', index)
+		assert self.instance is not None
+		assert self.index is None
+		self.index = index
+		self.form['point_xyz'] = list(self.instance['items'][index - 1])
+		self.instance_disable()
+		self.form_show()
+		self.layout()
+
+	def on_delete_button_click(self, event, index):
+		print('delete', index)
+		assert self.instance is not None
+		assert self.index is None
+		self.instance['items'].pop(index - 1)
+		self.instance_refresh()
+		self.layout()
+		self.draw()
+
+	def on_mark_button_click(self, event, which):
+		print('mark', which)
+		assert self.instance is not None
+		assert self.index is not None
+		assert which in [0, 1]
+		self.form['point_xyz'][which] = tuple(self.displayCtx.worldLocation.xyz)
+		if all(point_xyz is not None for point_xyz in self.form['point_xyz']):
+			self.instance['form_is_dirty'] = True
+		if which == 0:
+			self.pair_slider.SetValue(self.pair_slider.GetMin())
+		else:
+			self.pair_slider.SetValue(self.pair_slider.GetMax())
+		self.form_refresh()
+		if self.instance['form_is_dirty']:
+			self.draw()
+
+	def on_view_button_click(self, event, which):
+		print('view', which)
+		assert self.instance is not None
+		assert self.index is not None
+		assert which in [0, 1]
+		assert self.form['point_xyz'][which] is not None
+		self.displayCtx.worldLocation.xyz = self.form['point_xyz'][which]
+		if which == 0:
+			self.pair_slider.SetValue(self.pair_slider.GetMin())
+		else:
+			self.pair_slider.SetValue(self.pair_slider.GetMax())
+
+	def on_pair_slider_scroll(self, event):
+		print('pair', event.GetEventType(), event.GetPosition())
+		assert self.instance is not None
+		assert self.index is not None
+		entry_xyz, target_xyz = tuple(self.form['point_xyz'])
+		assert entry_xyz is not None and target_xyz is not None
+		slider = self.pair_slider
+		t = (slider.GetValue() - slider.GetMin()) / (slider.GetMax() - slider.GetMin())
+		point_xyz = numpy.average([entry_xyz, target_xyz], 0, [1-t, t])
+		self.displayCtx.worldLocation.xyz = tuple(point_xyz)
+
+	def on_submit_button_click(self, event):
+		print('submit')
+		assert self.instance is not None
+		assert self.index is not None
+		entry_xyz, target_xyz = tuple(self.form['point_xyz'])
+		assert entry_xyz is not None and target_xyz is not None
+		if numpy.allclose(entry_xyz, target_xyz):
+			wx.MessageBox(
+				'Entry and target points should differ.',
+				self.title(),
+				wx.OK | wx.ICON_INFORMATION,
+			)
+			return
+		if self.index > 0:
+			self.instance['items'][self.index - 1] = (entry_xyz, target_xyz)
+		else:
+			self.instance['items'].append((entry_xyz, target_xyz))
+		self.index = None
+		self.instance_refresh()
+		self.instance_enable()
+		self.form_hide()
+		self.layout()
+		self.draw()
+
+	def on_cancel_button_click(self, event):
+		print('cancel')
+		assert self.instance is not None
+		assert self.index is not None
+		self.index = None
+		self.instance_enable()
+		self.form_hide()
+		self.layout()
+		if self.instance['form_is_dirty']:
+			self.draw()
+			self.instance['form_is_dirty'] = False
 
 	def world2voxel(self, coords):
 		assert self.instance is not None
