@@ -25,7 +25,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			immediate=True,
 		)
 		container_sizer = wx.BoxSizer(wx.HORIZONTAL)
-		container_sizer.SetMinSize(225, 0)
+		container_sizer.SetMinSize(263, 0)
 		self.SetSizer(container_sizer)
 		container_sizer.AddSpacer(4)
 		home_sizer = wx.BoxSizer(wx.VERTICAL)
@@ -33,7 +33,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		self._init_start_items(home_sizer)
 		self._init_instance_items(home_sizer)
 		self._init_form_items(home_sizer)
-		container_sizer.Add(home_sizer, 1)
+		container_sizer.Add(home_sizer, 1, flag=wx.EXPAND)
 		container_sizer.AddSpacer(4)
 		self.reset()
 
@@ -73,14 +73,15 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		self.instance_items.append(home_sizer.Add(wx.StaticText(self, label='items')))
 		self.instance_items.append(home_sizer.AddSpacer(4))
 		# items sizer
-		items_sizer = wx.FlexGridSizer(4, 4, 4)
+		items_sizer = wx.FlexGridSizer(5, 4, 4)
 		items_sizer.SetFlexibleDirection(wx.HORIZONTAL)
 		self.instance_items.append(home_sizer.Add(items_sizer))
 		self.items_sizer = items_sizer
 		self.instance_items.append(home_sizer.AddSpacer(4))
 		# insert button
 		insert_button = wx.Button(self, label='insert')
-		insert_button.Bind(wx.EVT_BUTTON, self.on_insert_button_click)
+		handler = lambda event: self.on_insert_button_click(event, 0)
+		insert_button.Bind(wx.EVT_BUTTON, handler)
 		self.instance_items.append(home_sizer.Add(insert_button, flag=wx.ALIGN_CENTER))
 		self.insert_button = insert_button
 		self.instance_items.append(home_sizer.AddSpacer(4))
@@ -212,9 +213,11 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		assert self.instance is not None
 		self.items_sizer.Clear(True)
 		self.instance['update_button'] = []
+		self.instance['clone_button'] = []
 		self.instance['delete_button'] = []
 		view_bitmap = fsleyes.icons.loadBitmap('eye16')
 		update_bitmap = fsleyes.icons.loadBitmap('pencil24')
+		clone_bitmap = fsleyes.icons.loadBitmap('new24')
 		delete_bitmap = fsleyes.icons.loadBitmap('eraser24')
 		for i, (entry_xyz, target_xyz) in enumerate(self.instance['items']):
 			index = i + 1
@@ -248,6 +251,12 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			update_button.Bind(wx.EVT_BUTTON, handler)
 			self.items_sizer.Add(update_button, flag=wx.ALIGN_CENTER_VERTICAL)
 			self.instance['update_button'].append(update_button)
+			# clone button
+			clone_button = wx.BitmapButton(self, bitmap=clone_bitmap)
+			handler = lambda event, index=index: self.on_insert_button_click(event, index)
+			clone_button.Bind(wx.EVT_BUTTON, handler)
+			self.items_sizer.Add(clone_button, flag=wx.ALIGN_CENTER_VERTICAL)
+			self.instance['clone_button'].append(clone_button)
 			# delete button
 			delete_button = wx.BitmapButton(self, bitmap=delete_bitmap)
 			handler = lambda event, index=index: self.on_delete_button_click(event, index)
@@ -261,6 +270,8 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		self.insert_button.Enable()
 		for update_button in self.instance['update_button']:
 			update_button.Enable()
+		for clone_button in self.instance['clone_button']:
+			clone_button.Enable()
 		for delete_button in self.instance['delete_button']:
 			delete_button.Enable()
 
@@ -270,6 +281,8 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		self.insert_button.Disable()
 		for update_button in self.instance['update_button']:
 			update_button.Disable()
+		for clone_button in self.instance['clone_button']:
+			clone_button.Disable()
 		for delete_button in self.instance['delete_button']:
 			delete_button.Disable()
 
@@ -309,6 +322,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		self.GetSizer().Layout()
 
 	def draw(self):
+		print('draw')
 		assert self.instance is not None
 		image = self.instance['image']
 		data = numpy.zeros(image.shape, dtype=int)
@@ -452,12 +466,16 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		else:
 			self.instance = instance
 
-	def on_insert_button_click(self, event):
-		print('insert')
+	def on_insert_button_click(self, event, index):
+		print('insert', index)
 		assert self.instance is not None
 		assert self.index is None
+		if index == 0:
+			self.form['point_xyz'] = [None, None]
+		else:
+			assert index - 1 in range(len(self.instance['items']))
+			self.form['point_xyz'] = list(self.instance['items'][index - 1])
 		self.index = 0
-		self.form['point_xyz'] = [None, None]
 		self.instance_disable()
 		self.form_show()
 		self.layout()
