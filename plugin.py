@@ -454,7 +454,11 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 					wx.OK | wx.ICON_ERROR,
 				)
 				return
-			# TODO success message
+		wx.MessageBox(
+			'File saved successfully.',
+			self.title(),
+			wx.OK | wx.ICON_INFORMATION,
+		)
 
 	def on_close_button_click(self, event):
 		print('close')
