@@ -80,7 +80,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		self.instance_items.append(main_sizer.Add(close_sizer, flag=wx.EXPAND))
 		self.instance_items.append(main_sizer.AddSpacer(4))
 		# items line
-		self.instance_items.append(main_sizer.Add(wx.StaticLine(self.main_window)))
+		self.instance_items.append(main_sizer.Add(wx.StaticLine(self.main_window), flag=wx.EXPAND))
 		self.instance_items.append(main_sizer.AddSpacer(4))
 		# items text
 		self.instance_items.append(main_sizer.Add(wx.StaticText(self.main_window, label='items')))
@@ -102,7 +102,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 	def _init_form_items(self, main_sizer):
 		self.form_items = []
 		# form line
-		self.form_items.append(main_sizer.Add(wx.StaticLine(self.main_window)))
+		self.form_items.append(main_sizer.Add(wx.StaticLine(self.main_window), flag=wx.EXPAND))
 		self.form_items.append(main_sizer.AddSpacer(4))
 		# form text
 		form_text = wx.StaticText(self.main_window, label='item')
