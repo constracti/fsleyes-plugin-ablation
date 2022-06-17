@@ -24,98 +24,111 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			self.on_overlay_list_changed,
 			immediate=True,
 		)
-		container_sizer = wx.BoxSizer(wx.HORIZONTAL)
-		container_sizer.SetMinSize(263, 0)
-		self.SetSizer(container_sizer)
-		container_sizer.AddSpacer(4)
+		# home sizer
 		home_sizer = wx.BoxSizer(wx.VERTICAL)
-		home_sizer.AddSpacer(4)
-		self._init_start_items(home_sizer)
-		self._init_instance_items(home_sizer)
-		self._init_form_items(home_sizer)
-		container_sizer.Add(home_sizer, 1, flag=wx.EXPAND)
-		container_sizer.AddSpacer(4)
+		home_sizer.SetMinSize(263, 0)
+		self.SetSizer(home_sizer)
+		# main window
+		self.main_window = wx.lib.scrolledpanel.ScrolledPanel(self)
+		self.main_window.SetupScrolling()
+		home_sizer.Add(self.main_window, 1, flag=wx.EXPAND)
+		# horizontal sizer
+		horizontal_sizer = wx.BoxSizer(wx.HORIZONTAL)
+		self.main_window.SetSizer(horizontal_sizer)
+		# horizontal spacer
+		horizontal_sizer.AddSpacer(4)
+		# main sizer
+		main_sizer = wx.BoxSizer(wx.VERTICAL)
+		main_sizer.AddSpacer(4)
+		self._init_start_items(main_sizer)
+		self._init_instance_items(main_sizer)
+		self._init_form_items(main_sizer)
+		main_sizer.AddSpacer(4)
+		horizontal_sizer.Add(main_sizer, 1)
+		# horizontal spacer
+		horizontal_sizer.AddSpacer(4)
+		# reset
 		self.reset()
 
-	def _init_start_items(self, home_sizer):
+	def _init_start_items(self, main_sizer):
 		self.start_items = []
 		# open sizer
 		open_sizer = wx.BoxSizer(wx.HORIZONTAL)
-		new_button = wx.Button(self, label='new file')
+		new_button = wx.Button(self.main_window, label='new file')
 		handler = lambda event, load=False: self.on_load_button_click(event, load)
 		new_button.Bind(wx.EVT_BUTTON, handler)
 		open_sizer.Add(new_button)
 		open_sizer.Add(4, 0, 1)
-		load_button = wx.Button(self, label='load file')
+		load_button = wx.Button(self.main_window, label='load file')
 		handler = lambda event, load=True: self.on_load_button_click(event, load)
 		load_button.Bind(wx.EVT_BUTTON, handler)
 		open_sizer.Add(load_button)
-		self.start_items.append(home_sizer.Add(open_sizer, flag=wx.EXPAND))
-		self.start_items.append(home_sizer.AddSpacer(4))
+		self.start_items.append(main_sizer.Add(open_sizer, flag=wx.EXPAND))
+		self.start_items.append(main_sizer.AddSpacer(4))
 
-	def _init_instance_items(self, home_sizer):
+	def _init_instance_items(self, main_sizer):
 		self.instance_items = []
 		# close sizer
 		close_sizer = wx.BoxSizer(wx.HORIZONTAL)
-		save_button = wx.Button(self, label='save file')
+		save_button = wx.Button(self.main_window, label='save file')
 		save_button.Bind(wx.EVT_BUTTON, self.on_save_button_click)
 		close_sizer.Add(save_button)
 		close_sizer.Add(4, 0, 1)
-		close_button = wx.Button(self, label='close file')
+		close_button = wx.Button(self.main_window, label='close file')
 		close_button.Bind(wx.EVT_BUTTON, self.on_close_button_click)
 		close_sizer.Add(close_button)
-		self.instance_items.append(home_sizer.Add(close_sizer, flag=wx.EXPAND))
-		self.instance_items.append(home_sizer.AddSpacer(4))
+		self.instance_items.append(main_sizer.Add(close_sizer, flag=wx.EXPAND))
+		self.instance_items.append(main_sizer.AddSpacer(4))
 		# items line
-		self.instance_items.append(home_sizer.Add(wx.StaticLine(self)))
-		self.instance_items.append(home_sizer.AddSpacer(4))
+		self.instance_items.append(main_sizer.Add(wx.StaticLine(self.main_window)))
+		self.instance_items.append(main_sizer.AddSpacer(4))
 		# items text
-		self.instance_items.append(home_sizer.Add(wx.StaticText(self, label='items')))
-		self.instance_items.append(home_sizer.AddSpacer(4))
+		self.instance_items.append(main_sizer.Add(wx.StaticText(self.main_window, label='items')))
+		self.instance_items.append(main_sizer.AddSpacer(4))
 		# items sizer
 		items_sizer = wx.FlexGridSizer(5, 4, 4)
 		items_sizer.SetFlexibleDirection(wx.HORIZONTAL)
-		self.instance_items.append(home_sizer.Add(items_sizer))
+		self.instance_items.append(main_sizer.Add(items_sizer))
 		self.items_sizer = items_sizer
-		self.instance_items.append(home_sizer.AddSpacer(4))
+		self.instance_items.append(main_sizer.AddSpacer(4))
 		# insert button
-		insert_button = wx.Button(self, label='insert')
+		insert_button = wx.Button(self.main_window, label='insert')
 		handler = lambda event: self.on_insert_button_click(event, 0)
 		insert_button.Bind(wx.EVT_BUTTON, handler)
-		self.instance_items.append(home_sizer.Add(insert_button, flag=wx.ALIGN_CENTER))
+		self.instance_items.append(main_sizer.Add(insert_button, flag=wx.ALIGN_CENTER))
 		self.insert_button = insert_button
-		self.instance_items.append(home_sizer.AddSpacer(4))
+		self.instance_items.append(main_sizer.AddSpacer(4))
 
-	def _init_form_items(self, home_sizer):
+	def _init_form_items(self, main_sizer):
 		self.form_items = []
 		# form line
-		self.form_items.append(home_sizer.Add(wx.StaticLine(self)))
-		self.form_items.append(home_sizer.AddSpacer(4))
+		self.form_items.append(main_sizer.Add(wx.StaticLine(self.main_window)))
+		self.form_items.append(main_sizer.AddSpacer(4))
 		# form text
-		form_text = wx.StaticText(self, label='item')
-		self.form_items.append(home_sizer.Add(form_text))
+		form_text = wx.StaticText(self.main_window, label='item')
+		self.form_items.append(main_sizer.Add(form_text))
 		self.form_text = form_text
-		self.form_items.append(home_sizer.AddSpacer(4))
+		self.form_items.append(main_sizer.AddSpacer(4))
 		# pair sizer
 		pair_sizer = wx.FlexGridSizer(4, 4, 4)
 		pair_sizer.SetFlexibleDirection(wx.HORIZONTAL)
-		self.form_items.append(home_sizer.Add(pair_sizer))
-		self.form_items.append(home_sizer.AddSpacer(4))
+		self.form_items.append(main_sizer.Add(pair_sizer))
+		self.form_items.append(main_sizer.AddSpacer(4))
 		# pair sizer head
 		pair_sizer.Add(
-			wx.StaticText(self, label='point'),
+			wx.StaticText(self.main_window, label='point'),
 			flag=wx.ALIGN_LEFT|wx.ALIGN_CENTER_VERTICAL,
 		)
 		pair_sizer.Add(
-			wx.StaticText(self, label='coordinates'),
+			wx.StaticText(self.main_window, label='coordinates'),
 			flag=wx.ALIGN_LEFT|wx.ALIGN_CENTER_VERTICAL,
 		)
 		pair_sizer.Add(
-			wx.StaticText(self, label='mark'),
+			wx.StaticText(self.main_window, label='mark'),
 			flag=wx.ALIGN_CENTER_HORIZONTAL|wx.ALIGN_CENTER_VERTICAL,
 		)
 		pair_sizer.Add(
-			wx.StaticText(self, label='view'),
+			wx.StaticText(self.main_window, label='view'),
 			flag=wx.ALIGN_CENTER_HORIZONTAL|wx.ALIGN_CENTER_VERTICAL,
 		)
 		# pair sizer body
@@ -128,7 +141,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		for which in ['entry', 'target']:
 			# which text
 			pair_sizer.Add(
-				wx.StaticText(self, label=which),
+				wx.StaticText(self.main_window, label=which),
 				flag=wx.ALIGN_LEFT|wx.ALIGN_CENTER_VERTICAL,
 			)
 			# coordinates
@@ -136,7 +149,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			text_ctrl_list = []
 			for x in range(sizer.GetCols()):
 				text_ctrl = wx.TextCtrl(
-					self,
+					self.main_window,
 					size=wx.Size(30, 24),
 					style=wx.TE_READONLY|wx.TE_RIGHT,
 				)
@@ -145,7 +158,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			pair_sizer.Add(sizer)
 			self.form['coords_text'].append(text_ctrl_list)
 			# mark button
-			bitmap_button = wx.BitmapButton(self, bitmap=mark_bitmap)
+			bitmap_button = wx.BitmapButton(self.main_window, bitmap=mark_bitmap)
 			handler = lambda event, which=which: self.on_mark_button_click(event, which)
 			bitmap_button.Bind(wx.EVT_BUTTON, handler)
 			pair_sizer.Add(
@@ -153,7 +166,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 				flag=wx.ALIGN_CENTER_HORIZONTAL|wx.ALIGN_CENTER_VERTICAL,
 			)
 			# view button
-			bitmap_button = wx.BitmapButton(self, bitmap=view_bitmap)
+			bitmap_button = wx.BitmapButton(self.main_window, bitmap=view_bitmap)
 			handler = lambda event, which=which: self.on_view_button_click(event, 0, which)
 			bitmap_button.Bind(wx.EVT_BUTTON, handler)
 			pair_sizer.Add(
@@ -164,24 +177,24 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		self.form['coords_text'] = tuple(self.form['coords_text'])
 		self.form['view_button'] = tuple(self.form['view_button'])
 		# pair slider
-		pair_slider = wx.Slider(self)
+		pair_slider = wx.Slider(self.main_window)
 		pair_slider.Bind(wx.EVT_SCROLL_THUMBTRACK, self.on_pair_slider_scroll)
 		pair_slider.Bind(wx.EVT_SCROLL_CHANGED, self.on_pair_slider_scroll)
-		self.form_items.append(home_sizer.Add(pair_slider, flag=wx.EXPAND))
+		self.form_items.append(main_sizer.Add(pair_slider, flag=wx.EXPAND))
 		self.pair_slider = pair_slider
-		self.form_items.append(home_sizer.AddSpacer(4))
+		self.form_items.append(main_sizer.AddSpacer(4))
 		# submit sizer
 		submit_sizer = wx.BoxSizer(wx.HORIZONTAL)
-		submit_button = wx.Button(self, label='submit')
+		submit_button = wx.Button(self.main_window, label='submit')
 		submit_button.Bind(wx.EVT_BUTTON, self.on_submit_button_click)
 		submit_sizer.Add(submit_button)
 		self.submit_button = submit_button
 		submit_sizer.Add(4, 0, 1)
-		cancel_button = wx.Button(self, label='cancel')
+		cancel_button = wx.Button(self.main_window, label='cancel')
 		cancel_button.Bind(wx.EVT_BUTTON, self.on_cancel_button_click)
 		submit_sizer.Add(cancel_button)
-		self.form_items.append(home_sizer.Add(submit_sizer, flag=wx.EXPAND))
-		self.form_items.append(home_sizer.AddSpacer(4))
+		self.form_items.append(main_sizer.Add(submit_sizer, flag=wx.EXPAND))
+		self.form_items.append(main_sizer.AddSpacer(4))
 
 	def destroy(self):
 		self.overlayList.removeListener('overlays', self.name)
@@ -223,7 +236,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			index = i + 1
 			# index text
 			self.items_sizer.Add(wx.StaticText(
-				self,
+				self.main_window,
 				label='#{:d}'.format(index),
 			), flag=wx.ALIGN_RIGHT|wx.ALIGN_CENTER_VERTICAL)
 			# coordinates
@@ -235,30 +248,30 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			for which, point_xyz in coords_dict.items():
 				for value in point_xyz:
 					sizer.Add(wx.TextCtrl(
-						self,
+						self.main_window,
 						value='{:.0f}'.format(value),
 						size=wx.Size(30, 24),
 						style=wx.TE_READONLY|wx.TE_RIGHT,
 					), flag=wx.ALIGN_CENTER_VERTICAL)
-				view_button = wx.BitmapButton(self, bitmap=view_bitmap)
+				view_button = wx.BitmapButton(self.main_window, bitmap=view_bitmap)
 				handler = lambda event, index=index, which=which: self.on_view_button_click(event, index, which)
 				view_button.Bind(wx.EVT_BUTTON, handler)
 				sizer.Add(view_button, flag=wx.ALIGN_CENTER_VERTICAL)
 			self.items_sizer.Add(sizer)
 			# update button
-			update_button = wx.BitmapButton(self, bitmap=update_bitmap)
+			update_button = wx.BitmapButton(self.main_window, bitmap=update_bitmap)
 			handler = lambda event, index=index: self.on_update_button_click(event, index)
 			update_button.Bind(wx.EVT_BUTTON, handler)
 			self.items_sizer.Add(update_button, flag=wx.ALIGN_CENTER_VERTICAL)
 			self.instance['update_button'].append(update_button)
 			# clone button
-			clone_button = wx.BitmapButton(self, bitmap=clone_bitmap)
+			clone_button = wx.BitmapButton(self.main_window, bitmap=clone_bitmap)
 			handler = lambda event, index=index: self.on_insert_button_click(event, index)
 			clone_button.Bind(wx.EVT_BUTTON, handler)
 			self.items_sizer.Add(clone_button, flag=wx.ALIGN_CENTER_VERTICAL)
 			self.instance['clone_button'].append(clone_button)
 			# delete button
-			delete_button = wx.BitmapButton(self, bitmap=delete_bitmap)
+			delete_button = wx.BitmapButton(self.main_window, bitmap=delete_bitmap)
 			handler = lambda event, index=index: self.on_delete_button_click(event, index)
 			delete_button.Bind(wx.EVT_BUTTON, handler)
 			self.items_sizer.Add(delete_button, flag=wx.ALIGN_CENTER_VERTICAL)
