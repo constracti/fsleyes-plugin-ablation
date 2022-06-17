@@ -42,7 +42,6 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		main_sizer.AddSpacer(4)
 		self._init_start_items(main_sizer)
 		self._init_instance_items(main_sizer)
-		self._init_form_items(main_sizer)
 		main_sizer.AddSpacer(4)
 		horizontal_sizer.Add(main_sizer, 1)
 		# horizontal spacer
@@ -97,6 +96,35 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		insert_button.Bind(wx.EVT_BUTTON, handler)
 		self.instance_items.append(main_sizer.Add(insert_button, flag=wx.ALIGN_CENTER))
 		self.insert_button = insert_button
+		self.instance_items.append(main_sizer.AddSpacer(4))
+		# form
+		self._init_form_items(main_sizer)
+		# mask line
+		self.instance_items.append(main_sizer.Add(wx.StaticLine(self.main_window), flag=wx.EXPAND))
+		self.instance_items.append(main_sizer.AddSpacer(4))
+		# mask insert sizer
+		sizer = wx.BoxSizer(wx.HORIZONTAL)
+		sizer.Add(wx.StaticText(
+			self.main_window,
+			label='mask list'
+		), flag=wx.ALIGN_CENTER_VERTICAL)
+		sizer.Add(4, 0, 1)
+		button = wx.BitmapButton(
+			self.main_window,
+			bitmap=fsleyes.icons.loadBitmap('add24'),
+			size=wx.Size(26, 26),
+		)
+		button.SetToolTip('insert selected overlay to mask list')
+		button.Bind(wx.EVT_BUTTON, self.on_mask_insert_button_click)
+		sizer.Add(button, flag=wx.ALIGN_CENTER_VERTICAL)
+		self.instance_items.append(main_sizer.Add(sizer, flag=wx.EXPAND))
+		self.instance_items.append(main_sizer.AddSpacer(4))
+		# mask sizer
+		mask_sizer = wx.FlexGridSizer(3, 4, 4)
+		mask_sizer.SetFlexibleDirection(wx.HORIZONTAL)
+		mask_sizer.AddGrowableCol(0)
+		self.instance_items.append(main_sizer.Add(mask_sizer, flag=wx.EXPAND))
+		self.mask_sizer = mask_sizer
 		self.instance_items.append(main_sizer.AddSpacer(4))
 
 	def _init_form_items(self, main_sizer):
@@ -221,6 +249,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		for item in self.instance_items:
 			item.Show(False)
 		self.items_sizer.Clear(True)
+		self.mask_sizer.Clear(True)
 
 	def instance_refresh(self):
 		assert self.instance is not None
@@ -330,6 +359,41 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		enable = all(point_xyz is not None for point_xyz in self.form['point_xyz'])
 		self.submit_button.Enable(enable)
 		self.pair_slider.Enable(enable)
+
+	def mask_sizer_refresh(self):
+		assert self.instance is not None
+		self.mask_sizer.Clear(True)
+		for overlay in self.instance['mask_list']:
+			# name text
+			sizer = wx.BoxSizer(wx.HORIZONTAL)
+			self.mask_sizer.Add(sizer, flag=wx.EXPAND)
+			statictext = wx.StaticText(
+				self.main_window,
+				label=overlay.name,
+				style=wx.ST_ELLIPSIZE_MIDDLE,
+			)
+			statictext.SetToolTip(overlay.name)
+			sizer.Add(statictext, 1, flag=wx.ALIGN_CENTER_VERTICAL)
+			# select button
+			button = wx.BitmapButton(
+				self.main_window,
+				bitmap=fsleyes.icons.loadBitmap('eye24'),
+				size=wx.Size(26, 26),
+			)
+			button.SetToolTip('select overlay')
+			handler = lambda event, overlay=overlay: self.on_mask_select_button_click(event, overlay)
+			button.Bind(wx.EVT_BUTTON, handler)
+			self.mask_sizer.Add(button, flag=wx.ALIGN_CENTER_VERTICAL)
+			# remove button
+			button = wx.BitmapButton(
+				self.main_window,
+				bitmap=fsleyes.icons.loadBitmap('remove24'),
+				size=wx.Size(26, 26),
+			)
+			button.SetToolTip('remove overlay from mask list')
+			handler = lambda event, overlay=overlay: self.on_mask_remove_button_click(event, overlay)
+			button.Bind(wx.EVT_BUTTON, handler)
+			self.mask_sizer.Add(button, flag=wx.ALIGN_CENTER_VERTICAL)
 
 	def layout(self):
 		self.GetSizer().Layout()
@@ -441,6 +505,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			'image': image,
 			'items': items,
 			'form_is_dirty': False,
+			'mask_list': [],
 		}
 		self.index = None
 		self.start_hide()
@@ -605,6 +670,55 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			self.draw()
 			self.instance['form_is_dirty'] = False
 
+	def on_mask_insert_button_click(self, event):
+		print('mask append')
+		assert self.instance is not None
+		overlay = self.displayCtx.getSelectedOverlay()
+		if overlay is None:
+			wx.MessageBox(
+				'An overlay should be selected.',
+				self.title(),
+				wx.OK | wx.ICON_INFORMATION,
+			)
+			return
+		if overlay in self.instance['mask_list']:
+			wx.MessageBox(
+				'The selected overlay is already in the list.',
+				self.title(),
+				wx.OK | wx.ICON_INFORMATION,
+			)
+			return
+		# TODO check compatibility
+		if overlay.shape != self.instance['image'].shape:
+			wx.MessageBox(
+				'Selected overlay and base image should have identical shapes.',
+				self.title(),
+				wx.OK | wx.ICON_INFORMATION,
+			)
+			return
+		if not numpy.allclose(overlay.voxToWorldMat, self.instance['image'].voxToWorldMat):
+			wx.MessageBox(
+				'Selected overlay and base image should have identical affine transformations.',
+				self.title(),
+				wx.OK | wx.ICON_INFORMATION,
+			)
+			return
+		self.instance['mask_list'].append(overlay)
+		self.mask_sizer_refresh()
+		self.layout()
+
+	def on_mask_remove_button_click(self, event, overlay):
+		print('mask remove', overlay.name)
+		assert self.instance is not None
+		self.instance['mask_list'].remove(overlay)
+		self.mask_sizer_refresh()
+		self.layout()
+
+	def on_mask_select_button_click(self, event, overlay):
+		print('mask select', overlay.name)
+		assert self.instance is not None
+		overlay = self.displayCtx.selectOverlay(overlay)
+
 	def world2voxel(self, coords):
 		assert self.instance is not None
 		image = self.instance['image']
@@ -630,10 +744,19 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 	def on_overlay_list_changed(self, *args):
 		if self.instance is None:
 			return
-		if self.instance['image'] in self.overlayList:
+		if self.instance['image'] not in self.overlayList:
+			print('ablation image has been removed from overlay list')
+			self.reset()
 			return
-		print('ablation image has been removed from the overlay list')
-		self.reset()
+		refresh = False
+		for overlay in self.instance['mask_list']:
+			if overlay not in self.overlayList:
+				print('mask has been removed from overlay list')
+				self.instance['mask_list'].remove(overlay)
+				refresh = True
+		if refresh:
+			self.mask_sizer_refresh()
+			self.layout()
 
 	@staticmethod
 	def defaultLayout():
