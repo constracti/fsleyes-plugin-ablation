@@ -2,6 +2,8 @@
 
 
 import json
+import math
+
 import fsleyes
 import numpy
 import wx
@@ -109,6 +111,79 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		self.instance_items.append(main_sizer.AddSpacer(4))
 		# form
 		self._init_form_items(main_sizer)
+		# geometry line
+		self.instance_items.append(main_sizer.Add(wx.StaticLine(self.main_window), flag=wx.EXPAND))
+		self.instance_items.append(main_sizer.AddSpacer(4))
+		# geometry title sizer
+		self.geometry = {
+			'diameter': None,
+			'safezone': None,
+		}
+		sizer = wx.BoxSizer(wx.HORIZONTAL)
+		sizer.Add(wx.StaticText(
+			self.main_window,
+			label='needle geometry',
+		), flag=wx.ALIGN_CENTER_VERTICAL)
+		sizer.Add(4, 0, 1)
+		button = wx.BitmapButton(
+			self.main_window,
+			bitmap=fsleyes.icons.loadBitmap('folder16'),
+			size=wx.Size(26, 26),
+		)
+		button.SetToolTip('import geometry from json file')
+		button.Bind(wx.EVT_BUTTON, self.on_geometry_import_button_click)
+		sizer.Add(button, flag=wx.ALIGN_CENTER_VERTICAL)
+		sizer.Add(4, 0, 0)
+		button = wx.BitmapButton(
+			self.main_window,
+			bitmap=fsleyes.icons.loadBitmap('floppydisk16'),
+			size=wx.Size(26, 26),
+		)
+		button.SetToolTip('export geometry to json file')
+		button.Bind(wx.EVT_BUTTON, self.on_geometry_export_button_click)
+		sizer.Add(button, flag=wx.ALIGN_CENTER_VERTICAL)
+		self.instance_items.append(main_sizer.Add(sizer, flag=wx.EXPAND))
+		self.instance_items.append(main_sizer.AddSpacer(4))
+		# geometry diameter sizer
+		sizer = wx.BoxSizer(wx.HORIZONTAL)
+		sizer.Add(wx.StaticText(
+			self.main_window,
+			label='needle diameter (mm)',
+		), flag=wx.ALIGN_CENTER_VERTICAL)
+		sizer.Add(4, 0, 1)
+		spinctrl = wx.SpinCtrl(
+			self.main_window,
+			size=wx.Size(56, 24),
+			style=wx.ALIGN_RIGHT,
+			min=1,
+			max=20,
+		)
+		spinctrl.SetValue(3)
+		spinctrl.Bind(wx.EVT_SPINCTRL, self.on_geometry_diameter_spinctrl_change)
+		sizer.Add(spinctrl, flag=wx.ALIGN_CENTER_VERTICAL)
+		self.geometry['diameter'] = spinctrl
+		self.instance_items.append(main_sizer.Add(sizer, flag=wx.EXPAND))
+		self.instance_items.append(main_sizer.AddSpacer(4))
+		# geometry safezone sizer
+		sizer = wx.BoxSizer(wx.HORIZONTAL)
+		sizer.Add(wx.StaticText(
+			self.main_window,
+			label='safety zone radius (mm)',
+		), flag=wx.ALIGN_CENTER_VERTICAL)
+		sizer.Add(4, 0, 1)
+		spinctrl = wx.SpinCtrl(
+			self.main_window,
+			size=wx.Size(56, 24),
+			style=wx.ALIGN_RIGHT,
+			min=1,
+			max=50,
+		)
+		spinctrl.SetValue(15)
+		spinctrl.Bind(wx.EVT_SPINCTRL, self.on_geometry_safezone_spinctrl_change)
+		sizer.Add(spinctrl, flag=wx.ALIGN_CENTER_VERTICAL)
+		self.geometry['safezone'] = spinctrl
+		self.instance_items.append(main_sizer.Add(sizer, flag=wx.EXPAND))
+		self.instance_items.append(main_sizer.AddSpacer(4))
 		# mask line
 		self.instance_items.append(main_sizer.Add(wx.StaticLine(self.main_window), flag=wx.EXPAND))
 		self.instance_items.append(main_sizer.AddSpacer(4))
@@ -695,6 +770,28 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		if self.instance['form_is_dirty']:
 			self.draw()
 			self.instance['form_is_dirty'] = False
+
+	def on_geometry_import_button_click(self, event):
+		print('geometry import')
+		assert self.instance is not None
+		print('TODO import')
+
+	def on_geometry_export_button_click(self, event):
+		print('geometry export')
+		assert self.instance is not None
+		print('TODO export')
+
+	def on_geometry_diameter_spinctrl_change(self, event):
+		print('geometry diameter', event.GetPosition())
+		assert self.instance is not None
+		if self.geometry['safezone'].GetValue() < self.geometry['diameter'].GetValue() / 2:
+			self.geometry['safezone'].SetValue(math.ceil(self.geometry['diameter'].GetValue() / 2))
+
+	def on_geometry_safezone_spinctrl_change(self, event):
+		print('geometry safety zone', event.GetPosition())
+		assert self.instance is not None
+		if self.geometry['diameter'].GetValue() > self.geometry['safezone'].GetValue() * 2:
+			self.geometry['diameter'].SetValue(math.floor(self.geometry['safezone'].GetValue() * 2))
 
 	def on_mask_insert_button_click(self, event):
 		print('mask append')
