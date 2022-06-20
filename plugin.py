@@ -26,7 +26,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		)
 		# home sizer
 		home_sizer = wx.BoxSizer(wx.VERTICAL)
-		home_sizer.SetMinSize(263, 0)
+		home_sizer.SetMinSize(240, 0)
 		self.SetSizer(home_sizer)
 		# main window
 		self.main_window = wx.lib.scrolledpanel.ScrolledPanel(self)
@@ -78,24 +78,34 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		close_sizer.Add(close_button)
 		self.instance_items.append(main_sizer.Add(close_sizer, flag=wx.EXPAND))
 		self.instance_items.append(main_sizer.AddSpacer(4))
-		# items line
+		# needle line
 		self.instance_items.append(main_sizer.Add(wx.StaticLine(self.main_window), flag=wx.EXPAND))
 		self.instance_items.append(main_sizer.AddSpacer(4))
-		# items text
-		self.instance_items.append(main_sizer.Add(wx.StaticText(self.main_window, label='items')))
-		self.instance_items.append(main_sizer.AddSpacer(4))
-		# items sizer
-		items_sizer = wx.FlexGridSizer(5, 4, 4)
-		items_sizer.SetFlexibleDirection(wx.HORIZONTAL)
-		self.instance_items.append(main_sizer.Add(items_sizer))
-		self.items_sizer = items_sizer
-		self.instance_items.append(main_sizer.AddSpacer(4))
-		# insert button
-		insert_button = wx.Button(self.main_window, label='insert')
+		# needle insert sizer
+		sizer = wx.BoxSizer(wx.HORIZONTAL)
+		sizer.Add(wx.StaticText(
+			self.main_window,
+			label='needle list',
+		), flag=wx.ALIGN_CENTER_VERTICAL)
+		sizer.Add(4, 0, 1)
+		button = wx.BitmapButton(
+			self.main_window,
+			bitmap=fsleyes.icons.loadBitmap('add24'),
+			size=wx.Size(26, 26),
+		)
+		button.SetToolTip('insert needle')
 		handler = lambda event: self.on_insert_button_click(event, 0)
-		insert_button.Bind(wx.EVT_BUTTON, handler)
-		self.instance_items.append(main_sizer.Add(insert_button, flag=wx.ALIGN_CENTER))
-		self.insert_button = insert_button
+		button.Bind(wx.EVT_BUTTON, handler)
+		sizer.Add(button)
+		self.insert_button = button
+		self.instance_items.append(main_sizer.Add(sizer, flag=wx.EXPAND))
+		self.instance_items.append(main_sizer.AddSpacer(4))
+		# needle list sizer
+		sizer = wx.FlexGridSizer(5, 4, 4)
+		sizer.SetFlexibleDirection(wx.HORIZONTAL)
+		sizer.AddGrowableCol(1)
+		self.instance_items.append(main_sizer.Add(sizer, flag=wx.EXPAND))
+		self.items_sizer = sizer
 		self.instance_items.append(main_sizer.AddSpacer(4))
 		# form
 		self._init_form_items(main_sizer)
@@ -106,7 +116,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		sizer = wx.BoxSizer(wx.HORIZONTAL)
 		sizer.Add(wx.StaticText(
 			self.main_window,
-			label='mask list'
+			label='mask list',
 		), flag=wx.ALIGN_CENTER_VERTICAL)
 		sizer.Add(4, 0, 1)
 		button = wx.BitmapButton(
@@ -119,12 +129,12 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		sizer.Add(button, flag=wx.ALIGN_CENTER_VERTICAL)
 		self.instance_items.append(main_sizer.Add(sizer, flag=wx.EXPAND))
 		self.instance_items.append(main_sizer.AddSpacer(4))
-		# mask sizer
-		mask_sizer = wx.FlexGridSizer(3, 4, 4)
-		mask_sizer.SetFlexibleDirection(wx.HORIZONTAL)
-		mask_sizer.AddGrowableCol(0)
-		self.instance_items.append(main_sizer.Add(mask_sizer, flag=wx.EXPAND))
-		self.mask_sizer = mask_sizer
+		# mask list sizer
+		sizer = wx.FlexGridSizer(3, 4, 4)
+		sizer.SetFlexibleDirection(wx.HORIZONTAL)
+		sizer.AddGrowableCol(0)
+		self.instance_items.append(main_sizer.Add(sizer, flag=wx.EXPAND))
+		self.mask_sizer = sizer
 		self.instance_items.append(main_sizer.AddSpacer(4))
 
 	def _init_form_items(self, main_sizer):
@@ -242,7 +252,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		assert self.instance is not None
 		for item in self.instance_items:
 			item.Show(True)
-		self.instance_refresh()
+		self.needle_list_refresh()
 
 	def instance_hide(self):
 		assert self.instance is None
@@ -251,16 +261,12 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		self.items_sizer.Clear(True)
 		self.mask_sizer.Clear(True)
 
-	def instance_refresh(self):
+	def needle_list_refresh(self):
 		assert self.instance is not None
 		self.items_sizer.Clear(True)
 		self.instance['update_button'] = []
 		self.instance['clone_button'] = []
 		self.instance['delete_button'] = []
-		view_bitmap = fsleyes.icons.loadBitmap('eye16')
-		update_bitmap = fsleyes.icons.loadBitmap('pencil24')
-		clone_bitmap = fsleyes.icons.loadBitmap('new24')
-		delete_bitmap = fsleyes.icons.loadBitmap('eraser24')
 		for i, (entry_xyz, target_xyz) in enumerate(self.instance['items']):
 			index = i + 1
 			# index text
@@ -282,31 +288,51 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 						size=wx.Size(30, 24),
 						style=wx.TE_READONLY|wx.TE_RIGHT,
 					), flag=wx.ALIGN_CENTER_VERTICAL)
-				view_button = wx.BitmapButton(self.main_window, bitmap=view_bitmap)
+				button = wx.BitmapButton(
+					self.main_window,
+					bitmap=fsleyes.icons.loadBitmap('eye24'),
+					size=wx.Size(26, 26),
+				)
+				button.SetToolTip('focus')
 				handler = lambda event, index=index, which=which: self.on_view_button_click(event, index, which)
-				view_button.Bind(wx.EVT_BUTTON, handler)
-				sizer.Add(view_button, flag=wx.ALIGN_CENTER_VERTICAL)
+				button.Bind(wx.EVT_BUTTON, handler)
+				sizer.Add(button, flag=wx.ALIGN_CENTER_VERTICAL)
 			self.items_sizer.Add(sizer)
 			# update button
-			update_button = wx.BitmapButton(self.main_window, bitmap=update_bitmap)
+			button = wx.BitmapButton(
+				self.main_window,
+				bitmap=fsleyes.icons.loadBitmap('pencil24'),
+				size=wx.Size(26, 26),
+			)
+			button.SetToolTip('update needle #{:d}'.format(index))
 			handler = lambda event, index=index: self.on_update_button_click(event, index)
-			update_button.Bind(wx.EVT_BUTTON, handler)
-			self.items_sizer.Add(update_button, flag=wx.ALIGN_CENTER_VERTICAL)
-			self.instance['update_button'].append(update_button)
+			button.Bind(wx.EVT_BUTTON, handler)
+			self.items_sizer.Add(button, flag=wx.ALIGN_CENTER_VERTICAL)
+			self.instance['update_button'].append(button)
 			# clone button
-			clone_button = wx.BitmapButton(self.main_window, bitmap=clone_bitmap)
+			button = wx.BitmapButton(
+				self.main_window,
+				bitmap=fsleyes.icons.loadBitmap('new24'),
+				size=wx.Size(26, 26),
+			)
+			button.SetToolTip('clone needle #{:d}'.format(index))
 			handler = lambda event, index=index: self.on_insert_button_click(event, index)
-			clone_button.Bind(wx.EVT_BUTTON, handler)
-			self.items_sizer.Add(clone_button, flag=wx.ALIGN_CENTER_VERTICAL)
-			self.instance['clone_button'].append(clone_button)
+			button.Bind(wx.EVT_BUTTON, handler)
+			self.items_sizer.Add(button, flag=wx.ALIGN_CENTER_VERTICAL)
+			self.instance['clone_button'].append(button)
 			# delete button
-			delete_button = wx.BitmapButton(self.main_window, bitmap=delete_bitmap)
+			button = wx.BitmapButton(
+				self.main_window,
+				bitmap=fsleyes.icons.loadBitmap('remove24'),
+				size=wx.Size(26, 26),
+			)
+			button.SetToolTip('remove needle #{:d}'.format(index))
 			handler = lambda event, index=index: self.on_delete_button_click(event, index)
-			delete_button.Bind(wx.EVT_BUTTON, handler)
-			self.items_sizer.Add(delete_button, flag=wx.ALIGN_CENTER_VERTICAL)
-			self.instance['delete_button'].append(delete_button)
+			button.Bind(wx.EVT_BUTTON, handler)
+			self.items_sizer.Add(button, flag=wx.ALIGN_CENTER_VERTICAL)
+			self.instance['delete_button'].append(button)
 
-	def instance_enable(self):
+	def needle_list_enable(self):
 		assert self.instance is not None
 		assert self.index is None
 		self.insert_button.Enable()
@@ -317,7 +343,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		for delete_button in self.instance['delete_button']:
 			delete_button.Enable()
 
-	def instance_disable(self):
+	def needle_list_disable(self):
 		assert self.instance is not None
 		assert self.index is not None
 		self.insert_button.Disable()
@@ -334,9 +360,9 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		for item in self.form_items:
 			item.Show(True)
 		if self.index > 0:
-			self.form_text.SetLabelText('update item #{:d}'.format(self.index))
+			self.form_text.SetLabelText('update needle #{:d}'.format(self.index))
 		else:
-			self.form_text.SetLabelText('insert item')
+			self.form_text.SetLabelText('insert needle')
 		self.form_refresh()
 
 	def form_hide(self):
@@ -558,7 +584,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			assert index - 1 in range(len(self.instance['items']))
 			self.form['point_xyz'] = list(self.instance['items'][index - 1])
 		self.index = 0
-		self.instance_disable()
+		self.needle_list_disable()
 		self.form_show()
 		self.layout()
 
@@ -568,7 +594,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		assert self.index is None
 		self.index = index
 		self.form['point_xyz'] = list(self.instance['items'][index - 1])
-		self.instance_disable()
+		self.needle_list_disable()
 		self.form_show()
 		self.layout()
 
@@ -577,7 +603,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		assert self.instance is not None
 		assert self.index is None
 		self.instance['items'].pop(index - 1)
-		self.instance_refresh()
+		self.needle_list_refresh()
 		self.layout()
 		self.draw()
 
@@ -652,8 +678,8 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		else:
 			self.instance['items'].append((entry_xyz, target_xyz))
 		self.index = None
-		self.instance_refresh()
-		self.instance_enable()
+		self.needle_list_refresh()
+		self.needle_list_enable()
 		self.form_hide()
 		self.layout()
 		self.draw()
@@ -663,7 +689,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		assert self.instance is not None
 		assert self.index is not None
 		self.index = None
-		self.instance_enable()
+		self.needle_list_enable()
 		self.form_hide()
 		self.layout()
 		if self.instance['form_is_dirty']:
@@ -688,7 +714,6 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 				wx.OK | wx.ICON_INFORMATION,
 			)
 			return
-		# TODO check compatibility
 		if overlay.shape != self.instance['image'].shape:
 			wx.MessageBox(
 				'Selected overlay and base image should have identical shapes.',
