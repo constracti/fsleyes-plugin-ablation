@@ -12,6 +12,15 @@ import wx
 print('plugin: ablation')
 
 
+ABLATION_GEOMETRY_DIAMETER_MIN = 1
+ABLATION_GEOMETRY_DIAMETER_MAX = 20
+ABLATION_GEOMETRY_DIAMETER_DEF = 3
+
+ABLATION_GEOMETRY_SAFEZONE_MIN = 1
+ABLATION_GEOMETRY_SAFEZONE_MAX = 50
+ABLATION_GEOMETRY_SAFEZONE_DEF = 15
+
+
 class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 
 	@staticmethod
@@ -155,10 +164,10 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			self.main_window,
 			size=wx.Size(56, 24),
 			style=wx.ALIGN_RIGHT,
-			min=1,
-			max=20,
+			min=ABLATION_GEOMETRY_DIAMETER_MIN,
+			max=ABLATION_GEOMETRY_DIAMETER_MAX,
 		)
-		spinctrl.SetValue(3)
+		spinctrl.SetValue(ABLATION_GEOMETRY_DIAMETER_DEF)
 		spinctrl.Bind(wx.EVT_SPINCTRL, self.on_geometry_diameter_spinctrl_change)
 		sizer.Add(spinctrl, flag=wx.ALIGN_CENTER_VERTICAL)
 		self.geometry['diameter'] = spinctrl
@@ -175,10 +184,10 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			self.main_window,
 			size=wx.Size(56, 24),
 			style=wx.ALIGN_RIGHT,
-			min=1,
-			max=50,
+			min=ABLATION_GEOMETRY_SAFEZONE_MIN,
+			max=ABLATION_GEOMETRY_SAFEZONE_MAX,
 		)
-		spinctrl.SetValue(15)
+		spinctrl.SetValue(ABLATION_GEOMETRY_SAFEZONE_DEF)
 		spinctrl.Bind(wx.EVT_SPINCTRL, self.on_geometry_safezone_spinctrl_change)
 		sizer.Add(spinctrl, flag=wx.ALIGN_CENTER_VERTICAL)
 		self.geometry['safezone'] = spinctrl
@@ -546,48 +555,54 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			wx.MessageBox(
 				'An overlay should be selected.',
 				self.title(),
-				wx.OK | wx.ICON_INFORMATION,
+				wx.OK|wx.ICON_INFORMATION,
 			)
 			return
 		path = None
 		items = []
 		if load:
-			with wx.FileDialog(self, self.title(), wildcard='JSON files (.json)|*.json', style=wx.FD_OPEN|wx.FD_FILE_MUST_EXIST) as file_dialog:
+			path = None
+			with wx.FileDialog(
+				self,
+				self.title(),
+				wildcard='JSON files (.json)|*.json',
+				style=wx.FD_OPEN|wx.FD_FILE_MUST_EXIST,
+			) as file_dialog:
 				if file_dialog.ShowModal() == wx.ID_CANCEL:
 					return
 				path = file_dialog.GetPath()
-				try:
-					with open(path, 'r') as fp:
-						items = json.load(fp)
-					assert type(items) is list
-					for item in items:
-						assert type(item) is list and len(item) == 2
-						for point_xyz in item:
-							assert type(point_xyz) is list and len(point_xyz) == 3
-							for value in point_xyz:
-								assert type(value) is float
-					items = [tuple(tuple(point_xyz) for point_xyz in item) for item in items]
-				except IOError as error:
-					wx.MessageBox(
-						str(error),
-						self.title(),
-						wx.OK | wx.ICON_ERROR,
-					)
-					return
-				except json.JSONDecodeError as error:
-					wx.MessageBox(
-						str(error),
-						self.title(),
-						wx.OK | wx.ICON_ERROR,
-					)
-					return
-				except AssertionError:
-					wx.MessageBox(
-						'Input file should have compatible content.',
-						self.title(),
-						wx.OK | wx.ICON_ERROR,
-					)
-					return
+			try:
+				with open(path, 'r') as fp:
+					items = json.load(fp)
+				assert type(items) is list
+				for item in items:
+					assert type(item) is list and len(item) == 2
+					for point_xyz in item:
+						assert type(point_xyz) is list and len(point_xyz) == 3
+						for value in point_xyz:
+							assert type(value) is float
+				items = [tuple(tuple(point_xyz) for point_xyz in item) for item in items]
+			except IOError as error:
+				wx.MessageBox(
+					str(error),
+					self.title(),
+					wx.OK|wx.ICON_ERROR,
+				)
+				return
+			except json.JSONDecodeError as error:
+				wx.MessageBox(
+					str(error),
+					self.title(),
+					wx.OK|wx.ICON_ERROR,
+				)
+				return
+			except AssertionError:
+				wx.MessageBox(
+					'Input file should have compatible content.',
+					self.title(),
+					wx.OK|wx.ICON_ERROR,
+				)
+				return
 		nibimage = overlay.nibImage
 		xyzt_units = nibimage.header.get_xyzt_units()
 		image = fsleyes.actions.newimage.newImage(
@@ -617,26 +632,32 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 	def on_save_button_click(self, event):
 		print('save')
 		assert self.instance is not None
-		with wx.FileDialog(self, self.title(), wildcard='JSON files (.json)|*.json', style=wx.FD_SAVE|wx.FD_OVERWRITE_PROMPT) as file_dialog:
+		path = None
+		with wx.FileDialog(
+			self,
+			self.title(),
+			wildcard='JSON files (.json)|*.json',
+			style=wx.FD_SAVE|wx.FD_OVERWRITE_PROMPT,
+		) as file_dialog:
 			if self.instance['path'] is not None:
 				file_dialog.SetPath(self.instance['path'])
 			if file_dialog.ShowModal() == wx.ID_CANCEL:
 				return
 			path = file_dialog.GetPath()
-			try:
-				with open(path, 'w') as fp:
-					json.dump(self.instance['items'], fp, indent="\t")
-			except IOError as error:
-				wx.MessageBox(
-					str(error),
-					self.title(),
-					wx.OK | wx.ICON_ERROR,
-				)
-				return
+		try:
+			with open(path, 'w') as fp:
+				json.dump(self.instance['items'], fp, indent="\t")
+		except IOError as error:
+			wx.MessageBox(
+				str(error),
+				self.title(),
+				wx.OK|wx.ICON_ERROR,
+			)
+			return
 		wx.MessageBox(
 			'File saved successfully.',
 			self.title(),
-			wx.OK | wx.ICON_INFORMATION,
+			wx.OK|wx.ICON_INFORMATION,
 		)
 
 	def on_close_button_click(self, event):
@@ -745,7 +766,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			wx.MessageBox(
 				'Entry and target points should differ.',
 				self.title(),
-				wx.OK | wx.ICON_INFORMATION,
+				wx.OK|wx.ICON_INFORMATION,
 			)
 			return
 		if self.index > 0:
@@ -774,24 +795,99 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 	def on_geometry_import_button_click(self, event):
 		print('geometry import')
 		assert self.instance is not None
-		print('TODO import')
+		path = None
+		with wx.FileDialog(
+			self,
+			self.title(),
+			wildcard='JSON files (.json)|*.json',
+			style=wx.FD_OPEN|wx.FD_FILE_MUST_EXIST,
+		) as file_dialog:
+			if file_dialog.ShowModal() == wx.ID_CANCEL:
+				return
+			path = file_dialog.GetPath()
+		geometry = None
+		try:
+			with open(path, 'r') as fp:
+				geometry = json.load(fp)
+			assert type(geometry) is dict
+			assert 'diameter' in geometry and type(geometry['diameter']) is int
+			assert geometry['diameter'] >= ABLATION_GEOMETRY_DIAMETER_MIN
+			assert geometry['diameter'] <= ABLATION_GEOMETRY_DIAMETER_MAX
+			assert 'safezone' in geometry and type(geometry['safezone']) is int
+			assert geometry['safezone'] >= ABLATION_GEOMETRY_SAFEZONE_MIN
+			assert geometry['safezone'] <= ABLATION_GEOMETRY_SAFEZONE_MAX
+		except IOError as error:
+			wx.MessageBox(
+				str(error),
+				self.title(),
+				wx.OK|wx.ICON_ERROR,
+			)
+			return
+		except json.JSONDecodeError as error:
+			wx.MessageBox(
+				str(error),
+				self.title(),
+				wx.OK|wx.ICON_ERROR,
+			)
+			return
+		except AssertionError:
+			wx.MessageBox(
+				'Input file should have compatible content.',
+				self.title(),
+				wx.OK|wx.ICON_ERROR,
+			)
+			return
+		self.geometry['diameter'].SetValue(geometry['diameter'])
+		self.geometry['safezone'].SetValue(geometry['safezone'])
+		# TODO geometry changed!
 
 	def on_geometry_export_button_click(self, event):
 		print('geometry export')
 		assert self.instance is not None
-		print('TODO export')
+		path = None
+		with wx.FileDialog(
+			self,
+			self.title(),
+			defaultFile='geometry.json',
+			wildcard='JSON files (.json)|*.json',
+			style=wx.FD_SAVE|wx.FD_OVERWRITE_PROMPT,
+		) as file_dialog:
+			if file_dialog.ShowModal() == wx.ID_CANCEL:
+				return
+			path = file_dialog.GetPath()
+		geometry = {
+			'diameter': self.geometry['diameter'].GetValue(),
+			'safezone': self.geometry['safezone'].GetValue(),
+		}
+		try:
+			with open(path, 'w') as fp:
+				json.dump(geometry, fp, indent="\t")
+		except IOError as error:
+			wx.MessageBox(
+				str(error),
+				self.title(),
+				wx.OK|wx.ICON_ERROR,
+			)
+			return
+		wx.MessageBox(
+			'Needle geometry exported successfully.',
+			self.title(),
+			wx.OK|wx.ICON_INFORMATION,
+		)
 
 	def on_geometry_diameter_spinctrl_change(self, event):
 		print('geometry diameter', event.GetPosition())
 		assert self.instance is not None
 		if self.geometry['safezone'].GetValue() < self.geometry['diameter'].GetValue() / 2:
 			self.geometry['safezone'].SetValue(math.ceil(self.geometry['diameter'].GetValue() / 2))
+		# TODO geometry changed!
 
 	def on_geometry_safezone_spinctrl_change(self, event):
 		print('geometry safety zone', event.GetPosition())
 		assert self.instance is not None
 		if self.geometry['diameter'].GetValue() > self.geometry['safezone'].GetValue() * 2:
 			self.geometry['diameter'].SetValue(math.floor(self.geometry['safezone'].GetValue() * 2))
+		# TODO geometry changed!
 
 	def on_mask_insert_button_click(self, event):
 		print('mask append')
@@ -801,28 +897,28 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			wx.MessageBox(
 				'An overlay should be selected.',
 				self.title(),
-				wx.OK | wx.ICON_INFORMATION,
+				wx.OK|wx.ICON_INFORMATION,
 			)
 			return
 		if overlay in self.instance['mask_list']:
 			wx.MessageBox(
 				'The selected overlay is already in the list.',
 				self.title(),
-				wx.OK | wx.ICON_INFORMATION,
+				wx.OK|wx.ICON_INFORMATION,
 			)
 			return
 		if overlay.shape != self.instance['image'].shape:
 			wx.MessageBox(
 				'Selected overlay and base image should have identical shapes.',
 				self.title(),
-				wx.OK | wx.ICON_INFORMATION,
+				wx.OK|wx.ICON_INFORMATION,
 			)
 			return
 		if not numpy.allclose(overlay.voxToWorldMat, self.instance['image'].voxToWorldMat):
 			wx.MessageBox(
 				'Selected overlay and base image should have identical affine transformations.',
 				self.title(),
-				wx.OK | wx.ICON_INFORMATION,
+				wx.OK|wx.ICON_INFORMATION,
 			)
 			return
 		self.instance['mask_list'].append(overlay)
