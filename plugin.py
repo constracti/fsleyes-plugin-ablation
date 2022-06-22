@@ -21,6 +21,10 @@ ABLATION_GEOMETRY_SAFEZONE_MAX = 50
 ABLATION_GEOMETRY_SAFEZONE_DEF = 15
 
 
+def ablation_fa(icon):
+	return wx.Bitmap('fontawesome/{:s}.png'.format(icon), wx.BITMAP_TYPE_PNG)
+
+
 class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 
 	@staticmethod
@@ -37,7 +41,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		)
 		# home sizer
 		home_sizer = wx.BoxSizer(wx.VERTICAL)
-		home_sizer.SetMinSize(240, 0)
+		home_sizer.SetMinSize(280, 0)
 		self.SetSizer(home_sizer)
 		# main window
 		self.main_window = wx.lib.scrolledpanel.ScrolledPanel(self)
@@ -62,32 +66,63 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 
 	def _init_start_items(self, main_sizer):
 		self.start_items = []
-		# open sizer
-		open_sizer = wx.BoxSizer(wx.HORIZONTAL)
-		new_button = wx.Button(self.main_window, label='new file')
+		# top sizer
+		sizer = wx.BoxSizer(wx.HORIZONTAL)
+		button = wx.BitmapButton(
+			self.main_window,
+			bitmap=ablation_fa('file-solid-16'),
+			size=wx.Size(26, 26),
+		)
+		button.SetToolTip('create needle list')
 		handler = lambda event, load=False: self.on_load_button_click(event, load)
-		new_button.Bind(wx.EVT_BUTTON, handler)
-		open_sizer.Add(new_button)
-		open_sizer.Add(4, 0, 1)
-		load_button = wx.Button(self.main_window, label='load file')
+		button.Bind(wx.EVT_BUTTON, handler)
+		sizer.Add(button)
+		sizer.AddSpacer(4)
+		button = wx.BitmapButton(
+			self.main_window,
+			bitmap=ablation_fa('file-import-solid-16'),
+			size=wx.Size(26, 26),
+		)
+		button.SetToolTip('import needle list from json file')
 		handler = lambda event, load=True: self.on_load_button_click(event, load)
-		load_button.Bind(wx.EVT_BUTTON, handler)
-		open_sizer.Add(load_button)
-		self.start_items.append(main_sizer.Add(open_sizer, flag=wx.EXPAND))
+		button.Bind(wx.EVT_BUTTON, handler)
+		sizer.Add(button)
+		self.start_items.append(main_sizer.Add(sizer, flag=wx.EXPAND))
+		self.start_items.append(main_sizer.AddSpacer(4))
+		# link line
+		self.start_items.append(main_sizer.Add(wx.StaticLine(self.main_window), flag=wx.EXPAND))
+		self.start_items.append(main_sizer.AddSpacer(4))
+		# link ctrl
+		self.start_items.append(main_sizer.Add(wx.adv.HyperlinkCtrl(
+			self.main_window,
+			label='GitHub',
+			url='https://github.com/constracti/fsleyes-plugin-ablation',
+		)))
 		self.start_items.append(main_sizer.AddSpacer(4))
 
 	def _init_instance_items(self, main_sizer):
 		self.instance_items = []
-		# close sizer
-		close_sizer = wx.BoxSizer(wx.HORIZONTAL)
-		save_button = wx.Button(self.main_window, label='save file')
-		save_button.Bind(wx.EVT_BUTTON, self.on_save_button_click)
-		close_sizer.Add(save_button)
-		close_sizer.Add(4, 0, 1)
-		close_button = wx.Button(self.main_window, label='close file')
-		close_button.Bind(wx.EVT_BUTTON, self.on_close_button_click)
-		close_sizer.Add(close_button)
-		self.instance_items.append(main_sizer.Add(close_sizer, flag=wx.EXPAND))
+		# top sizer
+		sizer = wx.BoxSizer(wx.HORIZONTAL)
+		button = wx.BitmapButton(
+			self.main_window,
+			bitmap=ablation_fa('file-export-solid-16'),
+			size=wx.Size(26, 26),
+		)
+		button.SetToolTip('export needle list to json file')
+		button.Bind(wx.EVT_BUTTON, self.on_save_button_click)
+		sizer.Add(button)
+		sizer.AddStretchSpacer()
+		sizer.AddSpacer(4)
+		button = wx.BitmapButton(
+			self.main_window,
+			bitmap=ablation_fa('xmark-solid-16'),
+			size=wx.Size(26, 26),
+		)
+		button.SetToolTip('close needle list')
+		button.Bind(wx.EVT_BUTTON, self.on_close_button_click)
+		sizer.Add(button)
+		self.instance_items.append(main_sizer.Add(sizer, flag=wx.EXPAND))
 		self.instance_items.append(main_sizer.AddSpacer(4))
 		# needle line
 		self.instance_items.append(main_sizer.Add(wx.StaticLine(self.main_window), flag=wx.EXPAND))
@@ -98,10 +133,11 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			self.main_window,
 			label='needle list',
 		), flag=wx.ALIGN_CENTER_VERTICAL)
-		sizer.Add(4, 0, 1)
+		sizer.AddStretchSpacer()
+		sizer.AddSpacer(4)
 		button = wx.BitmapButton(
 			self.main_window,
-			bitmap=fsleyes.icons.loadBitmap('add24'),
+			bitmap=ablation_fa('plus-solid-16'),
 			size=wx.Size(26, 26),
 		)
 		button.SetToolTip('insert needle')
@@ -133,19 +169,20 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			self.main_window,
 			label='needle geometry',
 		), flag=wx.ALIGN_CENTER_VERTICAL)
-		sizer.Add(4, 0, 1)
+		sizer.AddStretchSpacer()
+		sizer.AddSpacer(4)
 		button = wx.BitmapButton(
 			self.main_window,
-			bitmap=fsleyes.icons.loadBitmap('folder16'),
+			bitmap=ablation_fa('file-import-solid-16'),
 			size=wx.Size(26, 26),
 		)
 		button.SetToolTip('import geometry from json file')
 		button.Bind(wx.EVT_BUTTON, self.on_geometry_import_button_click)
 		sizer.Add(button, flag=wx.ALIGN_CENTER_VERTICAL)
-		sizer.Add(4, 0, 0)
+		sizer.AddSpacer(4)
 		button = wx.BitmapButton(
 			self.main_window,
-			bitmap=fsleyes.icons.loadBitmap('floppydisk16'),
+			bitmap=ablation_fa('file-export-solid-16'),
 			size=wx.Size(26, 26),
 		)
 		button.SetToolTip('export geometry to json file')
@@ -159,7 +196,8 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			self.main_window,
 			label='needle diameter (mm)',
 		), flag=wx.ALIGN_CENTER_VERTICAL)
-		sizer.Add(4, 0, 1)
+		sizer.AddStretchSpacer()
+		sizer.AddSpacer(4)
 		spinctrl = wx.SpinCtrl(
 			self.main_window,
 			size=wx.Size(56, 24),
@@ -179,7 +217,8 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			self.main_window,
 			label='safety zone radius (mm)',
 		), flag=wx.ALIGN_CENTER_VERTICAL)
-		sizer.Add(4, 0, 1)
+		sizer.AddStretchSpacer()
+		sizer.AddSpacer(4)
 		spinctrl = wx.SpinCtrl(
 			self.main_window,
 			size=wx.Size(56, 24),
@@ -202,10 +241,11 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			self.main_window,
 			label='mask list',
 		), flag=wx.ALIGN_CENTER_VERTICAL)
-		sizer.Add(4, 0, 1)
+		sizer.AddStretchSpacer()
+		sizer.AddSpacer(4)
 		button = wx.BitmapButton(
 			self.main_window,
-			bitmap=fsleyes.icons.loadBitmap('add24'),
+			bitmap=ablation_fa('plus-solid-16'),
 			size=wx.Size(26, 26),
 		)
 		button.SetToolTip('insert selected overlay to mask list')
@@ -226,96 +266,94 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		# form line
 		self.form_items.append(main_sizer.Add(wx.StaticLine(self.main_window), flag=wx.EXPAND))
 		self.form_items.append(main_sizer.AddSpacer(4))
-		# form text
-		form_text = wx.StaticText(self.main_window, label='item')
-		self.form_items.append(main_sizer.Add(form_text))
+		# form title sizer
+		sizer = wx.BoxSizer(wx.HORIZONTAL)
+		form_text = wx.StaticText(
+			self.main_window,
+			label='item',
+		)
 		self.form_text = form_text
+		sizer.Add(form_text, flag=wx.ALIGN_CENTER_VERTICAL)
+		sizer.AddStretchSpacer()
+		sizer.AddSpacer(4)
+		button = wx.BitmapButton(
+			self.main_window,
+			bitmap=ablation_fa('floppy-disk-solid-16'),
+			size=wx.Size(26, 26),
+		)
+		button.SetToolTip('submit')
+		button.Bind(wx.EVT_BUTTON, self.on_submit_button_click)
+		sizer.Add(button, flag=wx.ALIGN_CENTER_VERTICAL)
+		self.submit_button = button
+		sizer.AddSpacer(4)
+		button = wx.BitmapButton(
+			self.main_window,
+			bitmap=ablation_fa('ban-solid-16'),
+			size=wx.Size(26, 26),
+		)
+		button.SetToolTip('cancel')
+		button.Bind(wx.EVT_BUTTON, self.on_cancel_button_click)
+		sizer.Add(button, flag=wx.ALIGN_CENTER_VERTICAL)
+		self.form_items.append(main_sizer.Add(sizer, flag=wx.EXPAND))
 		self.form_items.append(main_sizer.AddSpacer(4))
-		# pair sizer
-		pair_sizer = wx.FlexGridSizer(4, 4, 4)
-		pair_sizer.SetFlexibleDirection(wx.HORIZONTAL)
-		self.form_items.append(main_sizer.Add(pair_sizer))
+		# form table sizer
+		table_sizer = wx.FlexGridSizer(3, 4, 4)
+		table_sizer.SetFlexibleDirection(wx.HORIZONTAL)
+		table_sizer.AddGrowableCol(1)
+		self.form_items.append(main_sizer.Add(table_sizer, flag=wx.EXPAND))
 		self.form_items.append(main_sizer.AddSpacer(4))
-		# pair sizer head
-		pair_sizer.Add(
-			wx.StaticText(self.main_window, label='point'),
-			flag=wx.ALIGN_LEFT|wx.ALIGN_CENTER_VERTICAL,
-		)
-		pair_sizer.Add(
-			wx.StaticText(self.main_window, label='coordinates'),
-			flag=wx.ALIGN_LEFT|wx.ALIGN_CENTER_VERTICAL,
-		)
-		pair_sizer.Add(
-			wx.StaticText(self.main_window, label='mark'),
-			flag=wx.ALIGN_CENTER_HORIZONTAL|wx.ALIGN_CENTER_VERTICAL,
-		)
-		pair_sizer.Add(
-			wx.StaticText(self.main_window, label='view'),
-			flag=wx.ALIGN_CENTER_HORIZONTAL|wx.ALIGN_CENTER_VERTICAL,
-		)
-		# pair sizer body
 		self.form = {
 			'coords_text': [],
 			'view_button': [],
 		}
-		mark_bitmap = fsleyes.icons.loadBitmap('floppydisk16')
-		view_bitmap = fsleyes.icons.loadBitmap('eye16')
 		for which in ['entry', 'target']:
-			# which text
-			pair_sizer.Add(
-				wx.StaticText(self.main_window, label=which),
-				flag=wx.ALIGN_LEFT|wx.ALIGN_CENTER_VERTICAL,
-			)
+			# text
+			table_sizer.Add(wx.StaticText(
+				self.main_window,
+				label=which,
+				size=wx.Size(40, 16),
+			), flag=wx.ALIGN_CENTER_VERTICAL)
 			# coordinates
-			sizer = wx.FlexGridSizer(3, 1, 1)
+			sizer = wx.FlexGridSizer(4, 1, 1)
 			text_ctrl_list = []
-			for x in range(sizer.GetCols()):
+			for x in range(3):
 				text_ctrl = wx.TextCtrl(
 					self.main_window,
 					size=wx.Size(30, 24),
 					style=wx.TE_READONLY|wx.TE_RIGHT,
 				)
-				sizer.Add(text_ctrl)
+				sizer.Add(text_ctrl, flag=wx.ALIGN_CENTER_VERTICAL)
 				text_ctrl_list.append(text_ctrl)
-			pair_sizer.Add(sizer)
 			self.form['coords_text'].append(text_ctrl_list)
-			# mark button
-			bitmap_button = wx.BitmapButton(self.main_window, bitmap=mark_bitmap)
-			handler = lambda event, which=which: self.on_mark_button_click(event, which)
-			bitmap_button.Bind(wx.EVT_BUTTON, handler)
-			pair_sizer.Add(
-				bitmap_button,
-				flag=wx.ALIGN_CENTER_HORIZONTAL|wx.ALIGN_CENTER_VERTICAL,
+			button = wx.BitmapButton(
+				self.main_window,
+				bitmap=ablation_fa('crosshairs-solid-16'),
+				size=wx.Size(26, 26),
 			)
-			# view button
-			bitmap_button = wx.BitmapButton(self.main_window, bitmap=view_bitmap)
+			button.SetToolTip('view {:s}'.format(which))
 			handler = lambda event, which=which: self.on_view_button_click(event, 0, which)
-			bitmap_button.Bind(wx.EVT_BUTTON, handler)
-			pair_sizer.Add(
-				bitmap_button,
-				flag=wx.ALIGN_CENTER_HORIZONTAL|wx.ALIGN_CENTER_VERTICAL,
+			button.Bind(wx.EVT_BUTTON, handler)
+			sizer.Add(button, flag=wx.ALIGN_CENTER_VERTICAL)
+			self.form['view_button'].append(button)
+			table_sizer.Add(sizer, flag=wx.ALIGN_CENTER_VERTICAL)
+			# mark button
+			button = wx.BitmapButton(
+				self.main_window,
+				bitmap=ablation_fa('check-solid-16'),
+				size=wx.Size(26, 26),
 			)
-			self.form['view_button'].append(bitmap_button)
+			button.SetToolTip('mark {:s}'.format(which))
+			handler = lambda event, which=which: self.on_mark_button_click(event, which)
+			button.Bind(wx.EVT_BUTTON, handler)
+			table_sizer.Add(button, flag=wx.ALIGN_CENTER_VERTICAL)
 		self.form['coords_text'] = tuple(self.form['coords_text'])
 		self.form['view_button'] = tuple(self.form['view_button'])
-		# pair slider
-		pair_slider = wx.Slider(self.main_window)
-		pair_slider.Bind(wx.EVT_SCROLL_THUMBTRACK, self.on_pair_slider_scroll)
-		pair_slider.Bind(wx.EVT_SCROLL_CHANGED, self.on_pair_slider_scroll)
-		self.form_items.append(main_sizer.Add(pair_slider, flag=wx.EXPAND))
-		self.pair_slider = pair_slider
-		self.form_items.append(main_sizer.AddSpacer(4))
-		# submit sizer
-		submit_sizer = wx.BoxSizer(wx.HORIZONTAL)
-		submit_button = wx.Button(self.main_window, label='submit')
-		submit_button.Bind(wx.EVT_BUTTON, self.on_submit_button_click)
-		submit_sizer.Add(submit_button)
-		self.submit_button = submit_button
-		submit_sizer.Add(4, 0, 1)
-		cancel_button = wx.Button(self.main_window, label='cancel')
-		cancel_button.Bind(wx.EVT_BUTTON, self.on_cancel_button_click)
-		submit_sizer.Add(cancel_button)
-		self.form_items.append(main_sizer.Add(submit_sizer, flag=wx.EXPAND))
+		# form slider
+		slider = wx.Slider(self.main_window)
+		slider.Bind(wx.EVT_SCROLL_THUMBTRACK, self.on_pair_slider_scroll)
+		slider.Bind(wx.EVT_SCROLL_CHANGED, self.on_pair_slider_scroll)
+		self.form_items.append(main_sizer.Add(slider, flag=wx.EXPAND))
+		self.pair_slider = slider
 		self.form_items.append(main_sizer.AddSpacer(4))
 
 	def destroy(self):
@@ -357,7 +395,8 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			self.items_sizer.Add(wx.StaticText(
 				self.main_window,
 				label='#{:d}'.format(index),
-			), flag=wx.ALIGN_RIGHT|wx.ALIGN_CENTER_VERTICAL)
+				size=wx.Size(40, 16),
+			), flag=wx.ALIGN_CENTER_VERTICAL)
 			# coordinates
 			sizer = wx.FlexGridSizer(4, 1, 1)
 			coords_dict = {
@@ -374,7 +413,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 					), flag=wx.ALIGN_CENTER_VERTICAL)
 				button = wx.BitmapButton(
 					self.main_window,
-					bitmap=fsleyes.icons.loadBitmap('eye24'),
+					bitmap=ablation_fa('crosshairs-solid-16'),
 					size=wx.Size(26, 26),
 				)
 				button.SetToolTip('focus')
@@ -385,7 +424,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			# update button
 			button = wx.BitmapButton(
 				self.main_window,
-				bitmap=fsleyes.icons.loadBitmap('pencil24'),
+				bitmap=ablation_fa('pen-solid-16'),
 				size=wx.Size(26, 26),
 			)
 			button.SetToolTip('update needle #{:d}'.format(index))
@@ -396,7 +435,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			# clone button
 			button = wx.BitmapButton(
 				self.main_window,
-				bitmap=fsleyes.icons.loadBitmap('new24'),
+				bitmap=ablation_fa('copy-solid-16'),
 				size=wx.Size(26, 26),
 			)
 			button.SetToolTip('clone needle #{:d}'.format(index))
@@ -407,7 +446,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			# delete button
 			button = wx.BitmapButton(
 				self.main_window,
-				bitmap=fsleyes.icons.loadBitmap('remove24'),
+				bitmap=ablation_fa('minus-solid-16'),
 				size=wx.Size(26, 26),
 			)
 			button.SetToolTip('remove needle #{:d}'.format(index))
@@ -487,7 +526,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			# select button
 			button = wx.BitmapButton(
 				self.main_window,
-				bitmap=fsleyes.icons.loadBitmap('eye24'),
+				bitmap=ablation_fa('arrow-pointer-solid-16'),
 				size=wx.Size(26, 26),
 			)
 			button.SetToolTip('select overlay')
@@ -497,7 +536,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			# remove button
 			button = wx.BitmapButton(
 				self.main_window,
-				bitmap=fsleyes.icons.loadBitmap('remove24'),
+				bitmap=ablation_fa('minus-solid-16'),
 				size=wx.Size(26, 26),
 			)
 			button.SetToolTip('remove overlay from mask list')
