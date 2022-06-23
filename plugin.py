@@ -232,6 +232,38 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		self.geometry['safezone'] = spinctrl
 		self.instance_items.append(main_sizer.Add(sizer, flag=wx.EXPAND))
 		self.instance_items.append(main_sizer.AddSpacer(4))
+		# draw line
+		self.instance_items.append(main_sizer.Add(wx.StaticLine(self.main_window), flag=wx.EXPAND))
+		self.instance_items.append(main_sizer.AddSpacer(4))
+		# draw sizer
+		self.drawmode = {
+			'value': None,
+			'statictext': None,
+			'buttons': {
+				'none': ablation_fa('ban-solid-16'),
+				'line': ablation_fa('pencil-solid-16'),
+				'full': ablation_fa('fill-drip-solid-16'),
+			},
+		}
+		sizer = wx.BoxSizer(wx.HORIZONTAL)
+		statictext = wx.StaticText(self.main_window)
+		sizer.Add(statictext, flag=wx.ALIGN_CENTER_VERTICAL)
+		self.drawmode['statictext'] = statictext
+		sizer.AddStretchSpacer()
+		for mode, bitmap in self.drawmode['buttons'].items():
+			sizer.AddSpacer(4)
+			button = wx.BitmapToggleButton(
+				self.main_window,
+				label=bitmap,
+				size=wx.Size(26, 26),
+			)
+			button.SetToolTip(mode)
+			handler = lambda event, mode=mode: self.on_drawmode_button_click(event, mode)
+			button.Bind(wx.EVT_TOGGLEBUTTON, handler)
+			sizer.Add(button, flag=wx.ALIGN_CENTER_VERTICAL)
+			self.drawmode['buttons'][mode] = button
+		self.instance_items.append(main_sizer.Add(sizer, flag=wx.EXPAND))
+		self.instance_items.append(main_sizer.AddSpacer(4))
 		# mask line
 		self.instance_items.append(main_sizer.Add(wx.StaticLine(self.main_window), flag=wx.EXPAND))
 		self.instance_items.append(main_sizer.AddSpacer(4))
@@ -375,6 +407,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		for item in self.instance_items:
 			item.Show(True)
 		self.needle_list_refresh()
+		self.on_drawmode_button_click(None, 'line')
 
 	def instance_hide(self):
 		assert self.instance is None
@@ -483,16 +516,16 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		for item in self.form_items:
 			item.Show(True)
 		if self.index > 0:
-			self.form_text.SetLabelText('update needle #{:d}'.format(self.index))
+			self.form_text.SetLabel('update needle #{:d}'.format(self.index))
 		else:
-			self.form_text.SetLabelText('insert needle')
+			self.form_text.SetLabel('insert needle')
 		self.form_refresh()
 
 	def form_hide(self):
 		assert self.instance is None or self.index is None
 		for item in self.form_items:
 			item.Show(False)
-		self.form_text.SetLabelText('')
+		self.form_text.SetLabel('')
 
 	def form_refresh(self):
 		assert self.instance is not None
@@ -550,6 +583,8 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 	def draw(self):
 		print('draw')
 		assert self.instance is not None
+		if self.drawmode['value'] == 'none':
+			return
 		image = self.instance['image']
 		data = numpy.zeros(image.shape, dtype=int)
 		for i, (entry_xyz, target_xyz) in enumerate(self.instance['items']):
@@ -927,6 +962,25 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		if self.geometry['diameter'].GetValue() > self.geometry['safezone'].GetValue() * 2:
 			self.geometry['diameter'].SetValue(math.floor(self.geometry['safezone'].GetValue() * 2))
 		# TODO geometry changed!
+
+	def on_drawmode_button_click(self, event, mode):
+		print('drawmode', mode)
+		assert self.instance is not None
+		assert mode in self.drawmode['buttons']
+		self.drawmode['value'] = mode
+		self.drawmode['statictext'].SetLabel('draw mode: {:s}'.format(mode))
+		for mode, button in self.drawmode['buttons'].items():
+			if mode == self.drawmode['value']:
+				button.Disable()
+			else:
+				button.Enable()
+				button.SetValue(False)
+		if event is not None:
+			if self.drawmode['value'] == 'none':
+				image = self.instance['image']
+				data = numpy.zeros(image.shape, dtype=int)
+				image[:] = data[:]
+			self.draw()
 
 	def on_mask_insert_button_click(self, event):
 		print('mask append')
