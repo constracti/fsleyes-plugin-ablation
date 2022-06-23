@@ -6,6 +6,7 @@ import math
 
 import fsleyes
 import numpy
+import scipy.ndimage
 import wx
 
 
@@ -20,9 +21,53 @@ ABLATION_GEOMETRY_SAFEZONE_MIN = 1
 ABLATION_GEOMETRY_SAFEZONE_MAX = 50
 ABLATION_GEOMETRY_SAFEZONE_DEF = 15
 
+ABLATION_GEOMETRY_BORDER = 2
+
 
 def ablation_fa(icon):
 	return wx.Bitmap('fontawesome/{:s}.png'.format(icon), wx.BITMAP_TYPE_PNG)
+
+def ablation_box(mask, distance=0., zooms=None):
+	assert distance >= 0
+	if zooms is None:
+		zooms = (1,) * mask.ndim
+	assert len(zooms) == mask.ndim
+	assert all(x > 0 for x in zooms)
+	S = distance * numpy.reciprocal(zooms)
+	S = numpy.round(S).astype(int)
+	I = numpy.argwhere(mask)
+	LL = numpy.zeros(mask.ndim, dtype=int)
+	L = I.min(axis=0) - S
+	L = numpy.maximum(L, LL)
+	UU = numpy.asarray(mask.shape) + 1
+	U = I.max(axis=0) + S + 1
+	U = numpy.minimum(U, UU)
+	if numpy.array_equal(L, LL) and numpy.array_equal(U, UU):
+		return None
+	else:
+		return tuple(slice(l,u) for l, u in zip(L, U))
+
+def ablation_edt(mask, distance=1., zooms=None, box=False):
+	assert distance >= 0
+	if zooms is None:
+		zooms = (1,) * mask.ndim
+	assert len(zooms) == mask.ndim
+	assert all(x > 0 for x in zooms)
+	if box:
+		box = ablation_box(mask, distance, zooms)
+	else:
+		box = None
+	if box is None:
+		temp = mask
+	else:
+		temp = mask[box]
+	temp = scipy.ndimage.distance_transform_edt(~temp, zooms)
+	if box is None:
+		mask = temp
+	else:
+		mask = numpy.full(mask.shape, distance)
+		mask[box] = temp
+	return mask
 
 
 class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
@@ -578,24 +623,45 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 	def layout(self):
 		self.GetSizer().Layout()
 
-	def draw(self):
+	def draw(self, force=False):
 		print('draw')
 		assert self.instance is not None
-		if self.drawmode['value'] == 'none':
+		if self.drawmode['value'] == 'none' and not force:
 			return
 		image = self.instance['image']
 		data = numpy.zeros(image.shape, dtype=int)
-		for i, (entry_xyz, target_xyz) in enumerate(self.instance['items']):
-			index = i + 1
-			mask = self.pair2mask(entry_xyz, target_xyz) # 40ms/loop
-			data[mask] = index
-		if self.index is not None:
-			entry_xyz, target_xyz = tuple(self.form['point_xyz'])
-			if entry_xyz is not None and target_xyz is not None:
-				index = len(self.instance['items']) + 1
-				mask = self.pair2mask(entry_xyz, target_xyz) # 40ms
-				data[mask] = index
-		image[:] = data[:] # 270ms
+		if self.drawmode['value'] in ['line', 'full']:
+			needles = self.instance['items'].copy()
+			if self.instance['form_is_dirty']:
+				assert self.index is not None
+				assert all(point_xyz is not None for point_xyz in self.form['point_xyz'])
+				needles.append(tuple(self.form['point_xyz']))
+			for i, (entry_xyz, target_xyz) in enumerate(needles):
+				index = i + 1
+				from time import time
+				t = time()
+				mask = self.pair2mask(entry_xyz, target_xyz) # 40ms/loop
+				print('msk', time() - t)
+				if self.drawmode['value'] == 'line':
+					data[mask] = index
+				elif self.drawmode['value'] == 'full':
+					t = time()
+					mask = ablation_edt(
+						mask,
+						max(
+							self.geometry['diameter'].GetValue() / 2,
+							self.geometry['safezone'].GetValue(),
+						) + 1e-6,
+						self.instance['image'].pixdim,
+						box=True,
+					) # 1200ms/loop; with box: 50ms/loop
+					print('edt', time() - t)
+					# TODO is image.pixdim in mm?
+					data[(mask > self.geometry['safezone'].GetValue() - ABLATION_GEOMETRY_BORDER) * (mask <= self.geometry['safezone'].GetValue())] = 10 * index + 1 # 20ms/loop
+					print('sfz', time() - t)
+					data[mask <= self.geometry['diameter'].GetValue() / 2] = 10 * index # 10ms/loop
+					print('dmt', time() - t)
+		image[:] = data[:] # 300ms
 
 	def pair2mask(self, entry_xyz, target_xyz):
 		assert self.instance is not None
@@ -873,6 +939,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		self.needle_list_enable()
 		self.form_hide()
 		self.layout()
+		self.instance['form_is_dirty'] = False
 		self.draw()
 
 	def on_needle_cancel_button_click(self, event):
@@ -884,8 +951,8 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		self.form_hide()
 		self.layout()
 		if self.instance['form_is_dirty']:
-			self.draw()
 			self.instance['form_is_dirty'] = False
+			self.draw()
 
 	def on_geometry_import_button_click(self, event):
 		print('geometry import')
@@ -934,7 +1001,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			return
 		self.geometry['diameter'].SetValue(geometry['diameter'])
 		self.geometry['safezone'].SetValue(geometry['safezone'])
-		# TODO geometry changed!
+		self.draw()
 
 	def on_geometry_export_button_click(self, event):
 		print('geometry export')
@@ -976,14 +1043,14 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		assert self.instance is not None
 		if self.geometry['safezone'].GetValue() < self.geometry['diameter'].GetValue() / 2:
 			self.geometry['safezone'].SetValue(math.ceil(self.geometry['diameter'].GetValue() / 2))
-		# TODO geometry changed!
+		self.draw()
 
 	def on_geometry_safezone_spinctrl_change(self, event):
 		print('geometry safety zone', event.GetPosition())
 		assert self.instance is not None
 		if self.geometry['diameter'].GetValue() > self.geometry['safezone'].GetValue() * 2:
 			self.geometry['diameter'].SetValue(math.floor(self.geometry['safezone'].GetValue() * 2))
-		# TODO geometry changed!
+		self.draw()
 
 	def on_drawmode_button_click(self, event, mode):
 		print('drawmode', mode)
@@ -998,11 +1065,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 				button.Enable()
 				button.SetValue(False)
 		if event is not None:
-			if self.drawmode['value'] == 'none':
-				image = self.instance['image']
-				data = numpy.zeros(image.shape, dtype=int)
-				image[:] = data[:]
-			self.draw()
+			self.draw(force=True)
 
 	def on_mask_insert_button_click(self, event):
 		print('mask append')
