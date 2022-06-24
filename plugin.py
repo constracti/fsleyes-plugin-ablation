@@ -824,12 +824,8 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 	def on_instance_close_button_click(self, event):
 		print('close')
 		assert self.instance is not None
-		instance = self.instance
-		self.instance = None
-		if fsleyes.actions.removeoverlay.removeOverlay(self.overlayList, self.displayCtx, instance['image']):
+		if fsleyes.actions.removeoverlay.removeOverlay(self.overlayList, self.displayCtx, self.instance['image']):
 			self.reset()
-		else:
-			self.instance = instance
 
 	def on_needle_insert_button_click(self, event, index):
 		print('insert', index)
