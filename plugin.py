@@ -117,7 +117,7 @@ self.instance : dict|none
 	geometry_diameter : int
 	geometry_safezone : int
 	drawmode : str
-	mask_array : ndarray|none # TODO
+	mask_array : ndarray|none
 	mask_overlays : overlay[]
 	mask_bitmaps : bitmap[] # TODO
 
@@ -682,14 +682,20 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			if self.instance['form'] is not None and self.instance['form']['dirty']:
 				assert all(point is not None for point in self.instance['form']['point'].values())
 				needles.append(self.instance['form']['point'])
+			self.instance['mask_array'] = numpy.zeros(image.shape, dtype=bool)
 			for i, needle in enumerate(needles):
 				index = i + 1
+				mask_pass = True
+				if self.instance['form'] is not None and self.instance['form']['dirty'] and self.instance['form']['index'] == index:
+					mask_pass = False
 				from time import time # TODO
 				t = time()
 				mask = self.pair2mask(needle['entry'], needle['target']) # 40ms/loop
 				print('msk', time() - t)
 				if self.instance['drawmode'] == 'line':
 					data[mask] = index
+					if mask_pass:
+						self.instance['mask_array'][mask] = True
 				elif self.instance['drawmode'] == 'full':
 					t = time()
 					mask = ablation_edt(
@@ -707,7 +713,15 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 					print('sfz', time() - t)
 					data[mask <= self.instance['geometry_diameter'] / 2] = 10 * index # 10ms/loop
 					print('dmt', time() - t)
+					if mask_pass:
+						self.instance['mask_array'][mask <= self.instance['geometry_safezone']] = True
+		else:
+			self.instance['mask_array'] = None
 		image[:] = data[:] # 300ms
+		if self.instance['mask_array'] is not None:
+			for overlay in self.instance['mask_overlays']:
+				if numpy.any(overlay.data * self.instance['mask_array']):
+					print('intersection', overlay.name)
 
 	def pair2mask(self, entry_xyz, target_xyz):
 		assert self.instance is not None
@@ -1153,6 +1167,9 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			return
 		self.instance['mask_overlays'].append(overlay)
 		self.mask_sizer_refresh()
+		if self.instance['mask_array'] is not None:
+			if numpy.any(overlay.data * self.instance['mask_array']):
+				print('intersection', overlay.name)
 		self.layout()
 
 	def on_mask_remove_button_click(self, event, overlay):
