@@ -13,6 +13,9 @@ import wx
 print('plugin: ablation')
 
 
+# TODO split large lines of code
+# TODO remove prefix
+
 ABLATION_GEOMETRY_DIAMETER_MIN = 1
 ABLATION_GEOMETRY_DIAMETER_MAX = 20
 ABLATION_GEOMETRY_DIAMETER_DEF = 3
@@ -119,7 +122,7 @@ self.instance : dict|none
 	drawmode : str
 	mask_array : ndarray|none
 	mask_overlays : overlay[]
-	mask_bitmaps : bitmap[] # TODO
+	mask_bitmaps : staticbitmap[]
 
 """
 
@@ -375,9 +378,9 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		self.main_items.append(main_sizer.Add(sizer, flag=wx.EXPAND))
 		self.main_items.append(main_sizer.AddSpacer(4))
 		# mask list sizer
-		sizer = wx.FlexGridSizer(3, 4, 4)
+		sizer = wx.FlexGridSizer(4, 4, 4)
 		sizer.SetFlexibleDirection(wx.HORIZONTAL)
-		sizer.AddGrowableCol(0)
+		sizer.AddGrowableCol(1)
 		self.main_items.append(main_sizer.Add(sizer, flag=wx.EXPAND))
 		self.mask_sizer = sizer
 		self.main_items.append(main_sizer.AddSpacer(4))
@@ -515,9 +518,9 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		assert self.instance is not None
 		assert self.instance['form'] is None
 		self.needle_sizer.Clear(True)
-		self.instance['buttons']['update'] = []
-		self.instance['buttons']['clone'] = []
-		self.instance['buttons']['delete'] = []
+		self.instance['buttons']['update'].clear()
+		self.instance['buttons']['clone'].clear()
+		self.instance['buttons']['delete'].clear()
 		for i, needle in enumerate(self.instance['needles']):
 			index = i + 1
 			# index text
@@ -634,8 +637,17 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 
 	def mask_sizer_refresh(self):
 		assert self.instance is not None
+		self.instance['mask_bitmaps'].clear()
 		self.mask_sizer.Clear(True)
 		for overlay in self.instance['mask_overlays']:
+			# bitmap
+			staticbitmap = wx.StaticBitmap(
+				self.window,
+				size=wx.Size(26, 26),
+			)
+			self.mask_overlay_bitmap(overlay, staticbitmap)
+			self.mask_sizer.Add(staticbitmap, flag=wx.ALIGN_CENTER_VERTICAL)
+			self.instance['mask_bitmaps'].append(staticbitmap)
 			# name text
 			sizer = wx.BoxSizer(wx.HORIZONTAL)
 			self.mask_sizer.Add(sizer, flag=wx.EXPAND)
@@ -667,6 +679,13 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			button.Bind(wx.EVT_BUTTON, handler)
 			self.mask_sizer.Add(button, flag=wx.ALIGN_CENTER_VERTICAL)
 
+	def mask_overlay_bitmap(self, overlay, staticbitmap):
+		icon = 'circle-check-solid-16'
+		if self.instance['mask_array'] is not None:
+			if numpy.any(overlay.data * self.instance['mask_array']):
+				icon = 'triangle-exclamation-solid-16'
+		staticbitmap.SetBitmap(ablation_fa(icon))
+
 	def layout(self):
 		self.GetSizer().Layout()
 
@@ -688,16 +707,12 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 				mask_pass = True
 				if self.instance['form'] is not None and self.instance['form']['dirty'] and self.instance['form']['index'] == index:
 					mask_pass = False
-				from time import time # TODO
-				t = time()
 				mask = self.pair2mask(needle['entry'], needle['target']) # 40ms/loop
-				print('msk', time() - t)
 				if self.instance['drawmode'] == 'line':
 					data[mask] = index
 					if mask_pass:
 						self.instance['mask_array'][mask] = True
 				elif self.instance['drawmode'] == 'full':
-					t = time()
 					mask = ablation_edt(
 						mask,
 						max(
@@ -707,21 +722,16 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 						self.instance['image'].pixdim,
 						box=True,
 					) # 1200ms/loop; with box: 50ms/loop
-					print('edt', time() - t)
 					# TODO is image.pixdim in mm?
 					data[(mask > self.instance['geometry_safezone'] - ABLATION_GEOMETRY_BORDER) * (mask <= self.instance['geometry_safezone'])] = 10 * index + 1 # 20ms/loop
-					print('sfz', time() - t)
 					data[mask <= self.instance['geometry_diameter'] / 2] = 10 * index # 10ms/loop
-					print('dmt', time() - t)
 					if mask_pass:
 						self.instance['mask_array'][mask <= self.instance['geometry_safezone']] = True
 		else:
 			self.instance['mask_array'] = None
 		image[:] = data[:] # 300ms
-		if self.instance['mask_array'] is not None:
-			for overlay in self.instance['mask_overlays']:
-				if numpy.any(overlay.data * self.instance['mask_array']):
-					print('intersection', overlay.name)
+		for overlay, staticbitmap in zip(self.instance['mask_overlays'], self.instance['mask_bitmaps']):
+			self.mask_overlay_bitmap(overlay, staticbitmap)
 
 	def pair2mask(self, entry_xyz, target_xyz):
 		assert self.instance is not None
@@ -833,13 +843,18 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 				'entry': tuple(needle['entry']),
 				'target': tuple(needle['target']),
 			} for needle in instance['needles']],
-			'buttons': {},
+			'buttons': {
+				'update': [],
+				'clone': [],
+				'delete': [],
+			},
 			'form': None,
 			'geometry_diameter': instance['diameter'],
 			'geometry_safezone': instance['safezone'],
 			'drawmode': None,
 			'mask_array': None,
 			'mask_overlays': [],
+			'mask_bitmaps': [],
 		}
 		self.start_hide()
 		self.instance_show()
