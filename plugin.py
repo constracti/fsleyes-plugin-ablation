@@ -10,28 +10,52 @@ import scipy.ndimage
 import wx
 
 
-print('plugin: ablation')
+try:
+	import colorama
+except ModuleNotFoundError:
+	colorama = None
+
+def debug(*objects, sep=' ', end='\n', mode=None):
+	# IDEA verbosity
+	prefix = None
+	suffix = None
+	if mode is not None and colorama is not None:
+		if mode == 'info':
+			prefix = colorama.Fore.BLUE
+		elif mode == 'warning':
+			prefix = colorama.Fore.YELLOW
+		elif mode == 'success':
+			prefix = colorama.Fore.GREEN
+		elif mode == 'failure':
+			prefix = colorama.Fore.RED
+		if prefix is not None:
+			suffix = colorama.Fore.RESET
+	if prefix is None:
+		prefix = ''
+	if suffix is None:
+		suffix = ''
+	print(prefix, end='')
+	print('ablation:', *objects, sep=sep, end='')
+	print(suffix, end=end)
+
+debug('plugin loaded', mode='success')
 
 
-# TODO split large lines of code
-# TODO remove prefix
-# TODO delete print statements
+GEOMETRY_DIAMETER_MIN = 1
+GEOMETRY_DIAMETER_MAX = 20
+GEOMETRY_DIAMETER_DEF = 3
 
-ABLATION_GEOMETRY_DIAMETER_MIN = 1
-ABLATION_GEOMETRY_DIAMETER_MAX = 20
-ABLATION_GEOMETRY_DIAMETER_DEF = 3
+GEOMETRY_SAFEZONE_MIN = 1
+GEOMETRY_SAFEZONE_MAX = 50
+GEOMETRY_SAFEZONE_DEF = 15
 
-ABLATION_GEOMETRY_SAFEZONE_MIN = 1
-ABLATION_GEOMETRY_SAFEZONE_MAX = 50
-ABLATION_GEOMETRY_SAFEZONE_DEF = 15
-
-ABLATION_GEOMETRY_BORDER = 2
+GEOMETRY_BORDER = 2
 
 
-def ablation_fa(icon):
+def fa(icon):
 	return wx.Bitmap('fontawesome/{:s}.png'.format(icon), wx.BITMAP_TYPE_PNG)
 
-def ablation_box(mask, distance=0., zooms=None):
+def edt_box(mask, distance=0., zooms=None):
 	assert distance >= 0
 	if zooms is None:
 		zooms = (1,) * mask.ndim
@@ -51,14 +75,14 @@ def ablation_box(mask, distance=0., zooms=None):
 	else:
 		return tuple(slice(l,u) for l, u in zip(L, U))
 
-def ablation_edt(mask, distance=1., zooms=None, box=False):
+def edt(mask, distance=1., zooms=None, box=False):
 	assert distance >= 0
 	if zooms is None:
 		zooms = (1,) * mask.ndim
 	assert len(zooms) == mask.ndim
 	assert all(x > 0 for x in zooms)
 	if box:
-		box = ablation_box(mask, distance, zooms)
+		box = edt_box(mask, distance, zooms)
 	else:
 		box = None
 	if box is None:
@@ -135,6 +159,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		return 'Ablation'
 
 	def __init__(self, *args, **kwargs):
+		debug('creating panel', mode='info')
 		super().__init__(*args, **kwargs)
 		self.overlayList.addListener(
 			'overlays',
@@ -173,21 +198,23 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		sizer = wx.BoxSizer(wx.HORIZONTAL)
 		button = wx.BitmapButton(
 			self.window,
-			bitmap=ablation_fa('file-solid-16'),
+			bitmap=fa('file-solid-16'),
 			size=wx.Size(26, 26),
 		)
 		button.SetToolTip('create needle list')
-		handler = lambda event, load=False: self.on_instance_load_button_click(event, load)
+		handler = lambda event, load=False: \
+			self.on_instance_load_button_click(event, load)
 		button.Bind(wx.EVT_BUTTON, handler)
 		sizer.Add(button)
 		sizer.AddSpacer(4)
 		button = wx.BitmapButton(
 			self.window,
-			bitmap=ablation_fa('file-import-solid-16'),
+			bitmap=fa('file-import-solid-16'),
 			size=wx.Size(26, 26),
 		)
 		button.SetToolTip('import needle list from json file')
-		handler = lambda event, load=True: self.on_instance_load_button_click(event, load)
+		handler = lambda event, load=True: \
+			self.on_instance_load_button_click(event, load)
 		button.Bind(wx.EVT_BUTTON, handler)
 		sizer.Add(button)
 		self.init_items.append(main_sizer.Add(sizer, flag=wx.EXPAND))
@@ -209,7 +236,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		sizer = wx.BoxSizer(wx.HORIZONTAL)
 		button = wx.BitmapButton(
 			self.window,
-			bitmap=ablation_fa('file-export-solid-16'),
+			bitmap=fa('file-export-solid-16'),
 			size=wx.Size(26, 26),
 		)
 		button.SetToolTip('export needle list to json file')
@@ -219,7 +246,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		sizer.AddSpacer(4)
 		button = wx.BitmapButton(
 			self.window,
-			bitmap=ablation_fa('xmark-solid-16'),
+			bitmap=fa('xmark-solid-16'),
 			size=wx.Size(26, 26),
 		)
 		button.SetToolTip('close needle list')
@@ -240,11 +267,12 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		sizer.AddSpacer(4)
 		button = wx.BitmapButton(
 			self.window,
-			bitmap=ablation_fa('plus-solid-16'),
+			bitmap=fa('plus-solid-16'),
 			size=wx.Size(26, 26),
 		)
 		button.SetToolTip('insert needle')
-		handler = lambda event: self.on_needle_insert_button_click(event, 0)
+		handler = lambda event: \
+			self.on_needle_insert_button_click(event, 0)
 		button.Bind(wx.EVT_BUTTON, handler)
 		sizer.Add(button)
 		self.form_insert = button
@@ -272,7 +300,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		sizer.AddSpacer(4)
 		button = wx.BitmapButton(
 			self.window,
-			bitmap=ablation_fa('file-import-solid-16'),
+			bitmap=fa('file-import-solid-16'),
 			size=wx.Size(26, 26),
 		)
 		button.SetToolTip('import geometry from json file')
@@ -281,7 +309,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		sizer.AddSpacer(4)
 		button = wx.BitmapButton(
 			self.window,
-			bitmap=ablation_fa('file-export-solid-16'),
+			bitmap=fa('file-export-solid-16'),
 			size=wx.Size(26, 26),
 		)
 		button.SetToolTip('export geometry to json file')
@@ -301,8 +329,8 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			self.window,
 			size=wx.Size(56, 24),
 			style=wx.ALIGN_RIGHT,
-			min=ABLATION_GEOMETRY_DIAMETER_MIN,
-			max=ABLATION_GEOMETRY_DIAMETER_MAX,
+			min=GEOMETRY_DIAMETER_MIN,
+			max=GEOMETRY_DIAMETER_MAX,
 		)
 		spinctrl.Bind(wx.EVT_SPINCTRL, self.on_geometry_diameter_spinctrl_change)
 		sizer.Add(spinctrl, flag=wx.ALIGN_CENTER_VERTICAL)
@@ -321,8 +349,8 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			self.window,
 			size=wx.Size(56, 24),
 			style=wx.ALIGN_RIGHT,
-			min=ABLATION_GEOMETRY_SAFEZONE_MIN,
-			max=ABLATION_GEOMETRY_SAFEZONE_MAX,
+			min=GEOMETRY_SAFEZONE_MIN,
+			max=GEOMETRY_SAFEZONE_MAX,
 		)
 		spinctrl.Bind(wx.EVT_SPINCTRL, self.on_geometry_safezone_spinctrl_change)
 		sizer.Add(spinctrl, flag=wx.ALIGN_CENTER_VERTICAL)
@@ -339,9 +367,9 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		self.drawmode_title = statictext
 		sizer.AddStretchSpacer()
 		self.drawmode_buttons = {
-			'none': ablation_fa('ban-solid-16'),
-			'line': ablation_fa('pencil-solid-16'),
-			'full': ablation_fa('fill-drip-solid-16'),
+			'none': fa('ban-solid-16'),
+			'line': fa('pencil-solid-16'),
+			'full': fa('fill-drip-solid-16'),
 		}
 		for mode, bitmap in self.drawmode_buttons.items():
 			sizer.AddSpacer(4)
@@ -351,7 +379,8 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 				size=wx.Size(26, 26),
 			)
 			button.SetToolTip(mode)
-			handler = lambda event, mode=mode: self.on_drawmode_button_click(event, mode)
+			handler = lambda event, mode=mode: \
+				self.on_drawmode_button_click(event, mode)
 			button.Bind(wx.EVT_TOGGLEBUTTON, handler)
 			sizer.Add(button, flag=wx.ALIGN_CENTER_VERTICAL)
 			self.drawmode_buttons[mode] = button
@@ -370,7 +399,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		sizer.AddSpacer(4)
 		button = wx.BitmapButton(
 			self.window,
-			bitmap=ablation_fa('plus-solid-16'),
+			bitmap=fa('plus-solid-16'),
 			size=wx.Size(26, 26),
 		)
 		button.SetToolTip('insert selected overlay to mask list')
@@ -403,7 +432,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		sizer.AddSpacer(4)
 		button = wx.BitmapButton(
 			self.window,
-			bitmap=ablation_fa('floppy-disk-solid-16'),
+			bitmap=fa('floppy-disk-solid-16'),
 			size=wx.Size(26, 26),
 		)
 		button.SetToolTip('submit')
@@ -413,7 +442,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		sizer.AddSpacer(4)
 		button = wx.BitmapButton(
 			self.window,
-			bitmap=ablation_fa('ban-solid-16'),
+			bitmap=fa('ban-solid-16'),
 			size=wx.Size(26, 26),
 		)
 		button.SetToolTip('cancel')
@@ -456,11 +485,12 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			self.form_coordinates[which] = tuple(self.form_coordinates[which])
 			button = wx.BitmapButton(
 				self.window,
-				bitmap=ablation_fa('crosshairs-solid-16'),
+				bitmap=fa('crosshairs-solid-16'),
 				size=wx.Size(26, 26),
 			)
 			button.SetToolTip('view {:s}'.format(which))
-			handler = lambda event, which=which: self.on_needle_view_button_click(event, 0, which)
+			handler = lambda event, which=which: \
+				self.on_needle_view_button_click(event, 0, which)
 			button.Bind(wx.EVT_BUTTON, handler)
 			sizer.Add(button, flag=wx.ALIGN_CENTER_VERTICAL)
 			self.form_buttons[which] = button
@@ -468,11 +498,12 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			# mark button
 			button = wx.BitmapButton(
 				self.window,
-				bitmap=ablation_fa('check-solid-16'),
+				bitmap=fa('check-solid-16'),
 				size=wx.Size(26, 26),
 			)
 			button.SetToolTip('mark {:s}'.format(which))
-			handler = lambda event, which=which: self.on_needle_mark_button_click(event, which)
+			handler = lambda event, which=which: \
+				self.on_needle_mark_button_click(event, which)
 			button.Bind(wx.EVT_BUTTON, handler)
 			table_sizer.Add(button, flag=wx.ALIGN_CENTER_VERTICAL)
 		# form slider
@@ -484,6 +515,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		self.form_items.append(main_sizer.AddSpacer(4))
 
 	def destroy(self):
+		debug('destroying panel', mode='info')
 		self.overlayList.removeListener('overlays', self.name)
 		super().destroy()
 
@@ -542,44 +574,48 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 					), flag=wx.ALIGN_CENTER_VERTICAL)
 				button = wx.BitmapButton(
 					self.window,
-					bitmap=ablation_fa('crosshairs-solid-16'),
+					bitmap=fa('crosshairs-solid-16'),
 					size=wx.Size(26, 26),
 				)
 				button.SetToolTip('focus')
-				handler = lambda event, index=index, which=which: self.on_needle_view_button_click(event, index, which)
+				handler = lambda event, index=index, which=which: \
+					self.on_needle_view_button_click(event, index, which)
 				button.Bind(wx.EVT_BUTTON, handler)
 				sizer.Add(button, flag=wx.ALIGN_CENTER_VERTICAL)
 			self.needle_sizer.Add(sizer)
 			# update button
 			button = wx.BitmapButton(
 				self.window,
-				bitmap=ablation_fa('pen-solid-16'),
+				bitmap=fa('pen-solid-16'),
 				size=wx.Size(26, 26),
 			)
 			button.SetToolTip('update needle #{:d}'.format(index))
-			handler = lambda event, index=index: self.on_needle_update_button_click(event, index)
+			handler = lambda event, index=index: \
+				self.on_needle_update_button_click(event, index)
 			button.Bind(wx.EVT_BUTTON, handler)
 			self.needle_sizer.Add(button, flag=wx.ALIGN_CENTER_VERTICAL)
 			self.instance['buttons']['update'].append(button)
 			# clone button
 			button = wx.BitmapButton(
 				self.window,
-				bitmap=ablation_fa('copy-solid-16'),
+				bitmap=fa('copy-solid-16'),
 				size=wx.Size(26, 26),
 			)
 			button.SetToolTip('clone needle #{:d}'.format(index))
-			handler = lambda event, index=index: self.on_needle_insert_button_click(event, index)
+			handler = lambda event, index=index: \
+				self.on_needle_insert_button_click(event, index)
 			button.Bind(wx.EVT_BUTTON, handler)
 			self.needle_sizer.Add(button, flag=wx.ALIGN_CENTER_VERTICAL)
 			self.instance['buttons']['clone'].append(button)
 			# delete button
 			button = wx.BitmapButton(
 				self.window,
-				bitmap=ablation_fa('minus-solid-16'),
+				bitmap=fa('minus-solid-16'),
 				size=wx.Size(26, 26),
 			)
 			button.SetToolTip('remove needle #{:d}'.format(index))
-			handler = lambda event, index=index: self.on_needle_delete_button_click(event, index)
+			handler = lambda event, index=index: \
+				self.on_needle_delete_button_click(event, index)
 			button.Bind(wx.EVT_BUTTON, handler)
 			self.needle_sizer.Add(button, flag=wx.ALIGN_CENTER_VERTICAL)
 			self.instance['buttons']['delete'].append(button)
@@ -632,7 +668,10 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			for value, textctrl in zip(values, coordinates):
 				textctrl.SetValue(value)
 			button.Enable(point is not None)
-		enable = all(point is not None for point in self.instance['form']['point'].values())
+		enable = all(
+			point is not None
+			for point in self.instance['form']['point'].values()
+		)
 		self.form_submit.Enable(enable)
 		self.form_slider.Enable(enable)
 
@@ -662,21 +701,23 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			# select button
 			button = wx.BitmapButton(
 				self.window,
-				bitmap=ablation_fa('arrow-pointer-solid-16'),
+				bitmap=fa('arrow-pointer-solid-16'),
 				size=wx.Size(26, 26),
 			)
 			button.SetToolTip('select overlay')
-			handler = lambda event, overlay=overlay: self.on_mask_select_button_click(event, overlay)
+			handler = lambda event, overlay=overlay: \
+				self.on_mask_select_button_click(event, overlay)
 			button.Bind(wx.EVT_BUTTON, handler)
 			self.mask_sizer.Add(button, flag=wx.ALIGN_CENTER_VERTICAL)
 			# remove button
 			button = wx.BitmapButton(
 				self.window,
-				bitmap=ablation_fa('minus-solid-16'),
+				bitmap=fa('minus-solid-16'),
 				size=wx.Size(26, 26),
 			)
 			button.SetToolTip('remove overlay from mask list')
-			handler = lambda event, overlay=overlay: self.on_mask_remove_button_click(event, overlay)
+			handler = lambda event, overlay=overlay: \
+				self.on_mask_remove_button_click(event, overlay)
 			button.Bind(wx.EVT_BUTTON, handler)
 			self.mask_sizer.Add(button, flag=wx.ALIGN_CENTER_VERTICAL)
 
@@ -685,13 +726,13 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		if self.instance['mask_array'] is not None:
 			if numpy.any(overlay.data * self.instance['mask_array']):
 				icon = 'triangle-exclamation-solid-16'
-		staticbitmap.SetBitmap(ablation_fa(icon))
+		staticbitmap.SetBitmap(fa(icon))
 
 	def layout(self):
 		self.GetSizer().Layout()
 
 	def draw(self, force=False):
-		print('draw')
+		debug('draw', mode='info')
 		assert self.instance is not None
 		if self.instance['drawmode'] == 'none' and not force:
 			return
@@ -700,7 +741,10 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		if self.instance['drawmode'] in ['line', 'full']:
 			needles = self.instance['needles'].copy()
 			if self.instance['form'] is not None and self.instance['form']['dirty']:
-				assert all(point is not None for point in self.instance['form']['point'].values())
+				assert all(
+					point is not None
+					for point in self.instance['form']['point'].values()
+				)
 				needles.append(self.instance['form']['point'])
 			self.instance['mask_array'] = numpy.zeros(image.shape, dtype=bool)
 			for i, needle in enumerate(needles):
@@ -714,7 +758,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 					if mask_pass:
 						self.instance['mask_array'][mask] = True
 				elif self.instance['drawmode'] == 'full':
-					mask = ablation_edt(
+					mask = edt(
 						mask,
 						max(
 							self.instance['geometry_diameter'] / 2,
@@ -724,10 +768,13 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 						box=True,
 					) # 1200ms/loop; with box: 50ms/loop
 					# TODO is image.pixdim in mm?
-					data[(mask > self.instance['geometry_safezone'] - ABLATION_GEOMETRY_BORDER) * (mask <= self.instance['geometry_safezone'])] = 10 * index + 1 # 20ms/loop
-					data[mask <= self.instance['geometry_diameter'] / 2] = 10 * index # 10ms/loop
+					sz1 = mask > self.instance['geometry_safezone'] - GEOMETRY_BORDER
+					sz2 = mask <= self.instance['geometry_safezone']
+					data[sz1 * sz2] = 10 * index + 1 # 20ms/loop
+					dm2 = mask <= self.instance['geometry_diameter'] / 2
+					data[dm2] = 10 * index # 10ms/loop
 					if mask_pass:
-						self.instance['mask_array'][mask <= self.instance['geometry_safezone']] = True
+						self.instance['mask_array'][sz2] = True
 		else:
 			self.instance['mask_array'] = None
 		image[:] = data[:] # 300ms
@@ -741,9 +788,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		vector_xyz = numpy.asarray(target_xyz) - numpy.asarray(entry_xyz)
 		num = numpy.dot(numpy.abs(vector_xyz), numpy.reciprocal(image.pixdim))
 		num = round(num) + 1
-		print('entry', entry_xyz)
-		print('target', target_xyz)
-		print('count', num)
+		debug('count', num)
 		for t in numpy.linspace(0, 1, num):
 			point_xyz = numpy.average([entry_xyz, target_xyz], 0, [1-t, t])
 			point_ijk = self.world2voxel(point_xyz)
@@ -758,7 +803,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		self.layout()
 
 	def on_instance_load_button_click(self, event, load):
-		print('load' if load else 'new')
+		debug('load' if load else 'new', mode='info')
 		assert self.instance is None
 		assert type(load) is bool
 		overlay = self.displayCtx.getSelectedOverlay()
@@ -792,11 +837,11 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 						assert len(needle[which]) == 3
 						assert all(type(value) is float for value in needle[which])
 				assert 'diameter' in instance and type(instance['diameter']) is int
-				assert instance['diameter'] >= ABLATION_GEOMETRY_DIAMETER_MIN
-				assert instance['diameter'] <= ABLATION_GEOMETRY_DIAMETER_MAX
+				assert instance['diameter'] >= GEOMETRY_DIAMETER_MIN
+				assert instance['diameter'] <= GEOMETRY_DIAMETER_MAX
 				assert 'safezone' in instance and type(instance['safezone']) is int
-				assert instance['safezone'] >= ABLATION_GEOMETRY_SAFEZONE_MIN
-				assert instance['safezone'] <= ABLATION_GEOMETRY_SAFEZONE_MAX
+				assert instance['safezone'] >= GEOMETRY_SAFEZONE_MIN
+				assert instance['safezone'] <= GEOMETRY_SAFEZONE_MAX
 				assert instance['diameter'] <= 2 * instance['safezone']
 			except IOError as error:
 				wx.MessageBox(
@@ -822,8 +867,8 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		else:
 			instance = {
 				'needles': [],
-				'diameter': ABLATION_GEOMETRY_DIAMETER_DEF,
-				'safezone': ABLATION_GEOMETRY_SAFEZONE_DEF,
+				'diameter': GEOMETRY_DIAMETER_DEF,
+				'safezone': GEOMETRY_SAFEZONE_DEF,
 			}
 		nibimage = overlay.nibImage
 		xyzt_units = nibimage.header.get_xyzt_units()
@@ -864,7 +909,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		self.draw()
 
 	def on_instance_save_button_click(self, event):
-		print('save')
+		debug('save', mode='info')
 		assert self.instance is not None
 		path = None
 		with wx.FileDialog(
@@ -901,13 +946,13 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		)
 
 	def on_instance_close_button_click(self, event):
-		print('close')
+		debug('close', mode='info')
 		assert self.instance is not None
 		if fsleyes.actions.removeoverlay.removeOverlay(self.overlayList, self.displayCtx, self.instance['image']):
 			self.reset()
 
 	def on_needle_insert_button_click(self, event, index):
-		print('insert', index)
+		debug('insert', index, mode='info')
 		assert self.instance is not None
 		assert self.instance['form'] is None
 		if index == 0:
@@ -928,7 +973,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		self.layout()
 
 	def on_needle_update_button_click(self, event, index):
-		print('update', index)
+		debug('update', index, mode='info')
 		assert self.instance is not None
 		assert self.instance['form'] is None
 		assert index - 1 in range(len(self.instance['needles']))
@@ -942,7 +987,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		self.layout()
 
 	def on_needle_delete_button_click(self, event, index):
-		print('delete', index)
+		debug('delete', index, mode='info')
 		assert self.instance is not None
 		assert self.instance['form'] is None
 		assert index - 1 in range(len(self.instance['needles']))
@@ -952,7 +997,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		self.draw()
 
 	def on_needle_view_button_click(self, event, index, which):
-		print('view', index, which)
+		debug('view', index, which, mode='info')
 		assert self.instance is not None
 		assert which in ['entry', 'target']
 		if index == 0:
@@ -968,7 +1013,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			self.displayCtx.worldLocation.xyz = self.instance['needles'][index - 1][which]
 
 	def on_needle_mark_button_click(self, event, which):
-		print('mark', which)
+		debug('mark', which, mode='info')
 		assert self.instance is not None
 		assert self.instance['form'] is not None
 		assert which in ['entry', 'target']
@@ -985,7 +1030,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			self.draw()
 
 	def on_needle_slider_scroll(self, event):
-		print('slide', event.GetEventType(), event.GetPosition())
+		debug('slide', event.GetEventType(), event.GetPosition(), mode='info')
 		assert self.instance is not None
 		assert self.instance['form'] is not None
 		assert all(point is not None for point in self.instance['form']['point'].values())
@@ -996,7 +1041,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		self.displayCtx.worldLocation.xyz = tuple(point)
 
 	def on_needle_submit_button_click(self, event):
-		print('submit')
+		debug('submit', mode='info')
 		assert self.instance is not None
 		assert self.instance['form'] is not None
 		assert all(point is not None for point in self.instance['form']['point'].values())
@@ -1019,7 +1064,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		self.draw()
 
 	def on_needle_cancel_button_click(self, event):
-		print('cancel')
+		debug('cancel', mode='info')
 		assert self.instance is not None
 		assert self.instance['form'] is not None
 		dirty = self.instance['form']['dirty']
@@ -1031,7 +1076,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			self.draw()
 
 	def on_geometry_import_button_click(self, event):
-		print('geometry import')
+		debug('geometry import', mode='info')
 		assert self.instance is not None
 		path = None
 		with wx.FileDialog(
@@ -1048,11 +1093,11 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 				geometry = json.load(fp)
 			assert type(geometry) is dict
 			assert 'diameter' in geometry and type(geometry['diameter']) is int
-			assert geometry['diameter'] >= ABLATION_GEOMETRY_DIAMETER_MIN
-			assert geometry['diameter'] <= ABLATION_GEOMETRY_DIAMETER_MAX
+			assert geometry['diameter'] >= GEOMETRY_DIAMETER_MIN
+			assert geometry['diameter'] <= GEOMETRY_DIAMETER_MAX
 			assert 'safezone' in geometry and type(geometry['safezone']) is int
-			assert geometry['safezone'] >= ABLATION_GEOMETRY_SAFEZONE_MIN
-			assert geometry['safezone'] <= ABLATION_GEOMETRY_SAFEZONE_MAX
+			assert geometry['safezone'] >= GEOMETRY_SAFEZONE_MIN
+			assert geometry['safezone'] <= GEOMETRY_SAFEZONE_MAX
 			assert geometry['diameter'] <= 2 * geometry['safezone']
 		except IOError as error:
 			wx.MessageBox(
@@ -1082,7 +1127,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		self.draw()
 
 	def on_geometry_export_button_click(self, event):
-		print('geometry export')
+		debug('geometry export', mode='info')
 		assert self.instance is not None
 		path = None
 		with wx.FileDialog(
@@ -1117,7 +1162,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		)
 
 	def on_geometry_diameter_spinctrl_change(self, event):
-		print('geometry diameter', event.GetPosition())
+		debug('geometry diameter', event.GetPosition(), mode='info')
 		assert self.instance is not None
 		self.instance['geometry_diameter'] = self.geometry_diameter.GetValue()
 		if self.instance['geometry_safezone'] < self.instance['geometry_diameter'] / 2:
@@ -1126,7 +1171,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		self.draw()
 
 	def on_geometry_safezone_spinctrl_change(self, event):
-		print('geometry safety zone', event.GetPosition())
+		debug('geometry safety zone', event.GetPosition(), mode='info')
 		assert self.instance is not None
 		self.instance['geometry_safezone'] = self.geometry_safezone.GetValue()
 		if self.instance['geometry_diameter'] > self.instance['geometry_safezone'] * 2:
@@ -1135,7 +1180,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		self.draw()
 
 	def on_drawmode_button_click(self, event, mode):
-		print('drawmode', mode)
+		debug('drawmode', mode, mode='info')
 		assert self.instance is not None
 		assert mode in self.drawmode_buttons
 		self.instance['drawmode'] = mode
@@ -1151,7 +1196,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			self.draw(force=True)
 
 	def on_mask_insert_button_click(self, event):
-		print('mask append')
+		debug('mask append', mode='info')
 		assert self.instance is not None
 		overlay = self.displayCtx.getSelectedOverlay()
 		if overlay is None:
@@ -1184,13 +1229,10 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			return
 		self.instance['mask_overlays'].append(overlay)
 		self.mask_sizer_refresh()
-		if self.instance['mask_array'] is not None:
-			if numpy.any(overlay.data * self.instance['mask_array']):
-				print('intersection', overlay.name)
 		self.layout()
 
 	def on_mask_remove_button_click(self, event, overlay):
-		print('mask remove', overlay.name)
+		debug('mask remove', overlay.name, mode='info')
 		assert self.instance is not None
 		assert overlay in self.instance['mask_overlays']
 		self.instance['mask_overlays'].remove(overlay)
@@ -1198,7 +1240,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		self.layout()
 
 	def on_mask_select_button_click(self, event, overlay):
-		print('mask select', overlay.name)
+		debug('mask select', overlay.name, mode='info')
 		assert self.instance is not None
 		assert overlay in self.instance['mask_overlays']
 		overlay = self.displayCtx.selectOverlay(overlay)
@@ -1229,13 +1271,13 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		if self.instance is None:
 			return
 		if self.instance['image'] not in self.overlayList:
-			print('ablation image has been removed from overlay list')
+			debug('image has been removed from overlay list', mode='warning')
 			self.reset()
 			return
 		refresh = False
 		for overlay in self.instance['mask_overlays']:
 			if overlay not in self.overlayList:
-				print('mask has been removed from overlay list')
+				debug('mask has been removed from overlay list', mode='warning')
 				self.instance['mask_overlays'].remove(overlay)
 				refresh = True
 		if refresh:
