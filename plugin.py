@@ -15,6 +15,7 @@ print('plugin: ablation')
 
 # TODO split large lines of code
 # TODO remove prefix
+# TODO delete print statements
 
 ABLATION_GEOMETRY_DIAMETER_MIN = 1
 ABLATION_GEOMETRY_DIAMETER_MAX = 20
@@ -738,7 +739,8 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		image = self.instance['image']
 		mask = numpy.zeros(image.shape, dtype=bool)
 		vector_xyz = numpy.asarray(target_xyz) - numpy.asarray(entry_xyz)
-		num = numpy.dot(numpy.abs(vector_xyz), numpy.reciprocal(image.pixdim)).round().astype(int)
+		num = numpy.dot(numpy.abs(vector_xyz), numpy.reciprocal(image.pixdim))
+		num = round(num) + 1
 		print('entry', entry_xyz)
 		print('target', target_xyz)
 		print('count', num)
