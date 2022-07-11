@@ -129,6 +129,7 @@ self.mask_sizer : sizer
 self.instance : dict|none
 	path : str|none
 	image : image
+	unit_factor : float
 	needles : dict[]
 		entry : tuple of float
 		target : tuple of float
@@ -766,8 +767,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 						) + 1e-6,
 						self.instance['image'].pixdim,
 						box=True,
-					) # 1200ms/loop; with box: 50ms/loop
-					# TODO is image.pixdim in mm?
+					) * self.instance['unit_factor'] # 1200ms/loop; with box: 50ms/loop
 					sz1 = mask > self.instance['geometry_safezone'] - GEOMETRY_BORDER
 					sz2 = mask <= self.instance['geometry_safezone']
 					data[sz1 * sz2] = 10 * index + 1 # 20ms/loop
@@ -870,22 +870,35 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 				'diameter': GEOMETRY_DIAMETER_DEF,
 				'safezone': GEOMETRY_SAFEZONE_DEF,
 			}
-		nibimage = overlay.nibImage
-		xyzt_units = nibimage.header.get_xyzt_units()
 		image = fsleyes.actions.newimage.newImage(
-			nibimage.shape,
-			nibimage.header.get_zooms(),
+			overlay.shape,
+			overlay.pixdim,
 			int,
-			nibimage.affine,
-			xyzt_units[0],
-			xyzt_units[1],
+			overlay.voxToWorldMat,
+			overlay.xyzUnits,
+			overlay.timeUnits,
 			name='{:s}-ablation'.format(overlay.name),
 		)
+		xyz_units = overlay.xyzUnits
+		if xyz_units == 1: # meters
+			unit_factor = 1e3
+		elif xyz_units == 2: # millimeters
+			unit_factor = 1e0
+		elif xyz_units == 3: # micrometers
+			unit_factor = 1e-3
+		else:
+			unit_factor = 1e0
+			wx.MessageBox(
+				'The selected overlay has unspecified units; assuming millimeters.',
+				self.title(),
+				wx.OK|wx.ICON_WARNING,
+			)
 		self.overlayList.append(image)
 		self.displayCtx.selectOverlay(image)
 		self.instance = {
 			'path': path,
 			'image': image,
+			'unit_factor': unit_factor,
 			'needles': [{
 				'entry': tuple(needle['entry']),
 				'target': tuple(needle['target']),
@@ -1221,6 +1234,13 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			)
 			return
 		if not numpy.allclose(overlay.voxToWorldMat, self.instance['image'].voxToWorldMat):
+			wx.MessageBox(
+				'Selected overlay and base image should have identical affine transformations.',
+				self.title(),
+				wx.OK|wx.ICON_INFORMATION,
+			)
+			return
+		if overlay.xyzUnits != self.instance['image'].xyzUnits:
 			wx.MessageBox(
 				'Selected overlay and base image should have identical affine transformations.',
 				self.title(),
