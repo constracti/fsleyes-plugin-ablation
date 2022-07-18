@@ -3,6 +3,7 @@
 
 import json
 import math
+import os.path
 
 import fsleyes
 import numpy
@@ -53,7 +54,12 @@ GEOMETRY_BORDER = 2
 
 
 def fa(icon):
-	return wx.Bitmap('fontawesome/{:s}.png'.format(icon), wx.BITMAP_TYPE_PNG)
+	name = os.path.join(
+		os.path.dirname(__file__),
+		'fontawesome',
+		'{:s}.png'.format(icon),
+	)
+	return wx.Bitmap(name, wx.BITMAP_TYPE_PNG)
 
 def edt_box(mask, distance=0., zooms=None):
 	assert distance >= 0
