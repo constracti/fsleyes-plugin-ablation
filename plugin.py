@@ -130,7 +130,7 @@ self.drawmode_buttons : dict
 	none : bitmaptogglebutton
 	line : bitmaptogglebutton
 	full : bitmaptogglebutton
-self.mask_sizer : sizer
+self.danger_sizer : sizer
 
 self.instance : dict|none
 	path : str|none
@@ -152,9 +152,9 @@ self.instance : dict|none
 	geometry_diameter : int
 	geometry_safezone : int
 	drawmode : str
-	mask_array : ndarray|none
-	mask_overlays : overlay[]
-	mask_bitmaps : staticbitmap[]
+	danger_array : ndarray|none
+	danger_overlays : overlay[]
+	danger_bitmaps : staticbitmap[]
 
 """
 
@@ -393,14 +393,14 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			self.drawmode_buttons[mode] = button
 		self.main_items.append(main_sizer.Add(sizer, flag=wx.EXPAND))
 		self.main_items.append(main_sizer.AddSpacer(4))
-		# mask line
+		# danger line
 		self.main_items.append(main_sizer.Add(wx.StaticLine(self.window), flag=wx.EXPAND))
 		self.main_items.append(main_sizer.AddSpacer(4))
-		# mask title sizer
+		# danger title sizer
 		sizer = wx.BoxSizer(wx.HORIZONTAL)
 		sizer.Add(wx.StaticText(
 			self.window,
-			label='mask list',
+			label='avoid mask list',
 		), flag=wx.ALIGN_CENTER_VERTICAL)
 		sizer.AddStretchSpacer()
 		sizer.AddSpacer(4)
@@ -409,17 +409,17 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			bitmap=fa('plus-solid-16'),
 			size=wx.Size(26, 26),
 		)
-		button.SetToolTip('insert selected overlay to mask list')
-		button.Bind(wx.EVT_BUTTON, self.on_mask_insert_button_click)
+		button.SetToolTip('insert selected overlay to avoid mask list')
+		button.Bind(wx.EVT_BUTTON, self.on_danger_insert_button_click)
 		sizer.Add(button, flag=wx.ALIGN_CENTER_VERTICAL)
 		self.main_items.append(main_sizer.Add(sizer, flag=wx.EXPAND))
 		self.main_items.append(main_sizer.AddSpacer(4))
-		# mask list sizer
+		# danger list sizer
 		sizer = wx.FlexGridSizer(4, 4, 4)
 		sizer.SetFlexibleDirection(wx.HORIZONTAL)
 		sizer.AddGrowableCol(1)
 		self.main_items.append(main_sizer.Add(sizer, flag=wx.EXPAND))
-		self.mask_sizer = sizer
+		self.danger_sizer = sizer
 		self.main_items.append(main_sizer.AddSpacer(4))
 
 	def build_form_items(self, main_sizer):
@@ -552,7 +552,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		for item in self.main_items:
 			item.Show(False)
 		self.needle_sizer.Clear(True)
-		self.mask_sizer.Clear(True)
+		self.danger_sizer.Clear(True)
 
 	def needle_sizer_refresh(self):
 		assert self.instance is not None
@@ -682,22 +682,22 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		self.form_submit.Enable(enable)
 		self.form_slider.Enable(enable)
 
-	def mask_sizer_refresh(self):
+	def danger_sizer_refresh(self):
 		assert self.instance is not None
-		self.instance['mask_bitmaps'].clear()
-		self.mask_sizer.Clear(True)
-		for overlay in self.instance['mask_overlays']:
+		self.instance['danger_bitmaps'].clear()
+		self.danger_sizer.Clear(True)
+		for overlay in self.instance['danger_overlays']:
 			# bitmap
 			staticbitmap = wx.StaticBitmap(
 				self.window,
 				size=wx.Size(26, 26),
 			)
-			self.mask_overlay_bitmap(overlay, staticbitmap)
-			self.mask_sizer.Add(staticbitmap, flag=wx.ALIGN_CENTER_VERTICAL)
-			self.instance['mask_bitmaps'].append(staticbitmap)
+			self.danger_sizer.Add(staticbitmap, flag=wx.ALIGN_CENTER_VERTICAL)
+			self.instance['danger_bitmaps'].append(staticbitmap)
+			self.danger_overlay_check(overlay, staticbitmap)
 			# name text
 			sizer = wx.BoxSizer(wx.HORIZONTAL)
-			self.mask_sizer.Add(sizer, flag=wx.EXPAND)
+			self.danger_sizer.Add(sizer, flag=wx.EXPAND)
 			statictext = wx.StaticText(
 				self.window,
 				label=overlay.name,
@@ -713,27 +713,33 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			)
 			button.SetToolTip('select overlay')
 			handler = lambda event, overlay=overlay: \
-				self.on_mask_select_button_click(event, overlay)
+				self.on_danger_select_button_click(event, overlay)
 			button.Bind(wx.EVT_BUTTON, handler)
-			self.mask_sizer.Add(button, flag=wx.ALIGN_CENTER_VERTICAL)
+			self.danger_sizer.Add(button, flag=wx.ALIGN_CENTER_VERTICAL)
 			# remove button
 			button = wx.BitmapButton(
 				self.window,
 				bitmap=fa('minus-solid-16'),
 				size=wx.Size(26, 26),
 			)
-			button.SetToolTip('remove overlay from mask list')
+			button.SetToolTip('remove overlay from avoid mask list')
 			handler = lambda event, overlay=overlay: \
-				self.on_mask_remove_button_click(event, overlay)
+				self.on_danger_remove_button_click(event, overlay)
 			button.Bind(wx.EVT_BUTTON, handler)
-			self.mask_sizer.Add(button, flag=wx.ALIGN_CENTER_VERTICAL)
+			self.danger_sizer.Add(button, flag=wx.ALIGN_CENTER_VERTICAL)
 
-	def mask_overlay_bitmap(self, overlay, staticbitmap):
+	def danger_overlay_check(self, overlay, staticbitmap):
 		icon = 'circle-check-solid-16'
-		if self.instance['mask_array'] is not None:
-			if numpy.any(overlay.data * self.instance['mask_array']):
+		tooltip = None
+		if self.instance['danger_array'] is not None:
+			index = numpy.amax(overlay.data.astype(bool) * self.instance['danger_array'])
+			if index > 0:
+				if index > len(self.instance['needles']):
+					index = self.instance['form']['index']
 				icon = 'triangle-exclamation-solid-16'
+				tooltip = '#{:d}'.format(index)
 		staticbitmap.SetBitmap(fa(icon))
+		staticbitmap.SetToolTip(tooltip)
 
 	def layout(self):
 		self.GetSizer().Layout()
@@ -753,17 +759,17 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 					for point in self.instance['form']['point'].values()
 				)
 				needles.append(self.instance['form']['point'])
-			self.instance['mask_array'] = numpy.zeros(image.shape, dtype=bool)
+			self.instance['danger_array'] = numpy.zeros(image.shape, dtype=int)
 			for i, needle in enumerate(needles):
 				index = i + 1
-				mask_pass = True
+				danger_pass = True
 				if self.instance['form'] is not None and self.instance['form']['dirty'] and self.instance['form']['index'] == index:
-					mask_pass = False
+					danger_pass = False
 				mask = self.pair2mask(needle['entry'], needle['target']) # 40ms/loop
 				if self.instance['drawmode'] == 'line':
 					data[mask] = index
-					if mask_pass:
-						self.instance['mask_array'][mask] = True
+					if danger_pass:
+						self.instance['danger_array'][mask] = index
 				elif self.instance['drawmode'] == 'full':
 					mask = edt(
 						mask,
@@ -779,13 +785,13 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 					data[sz1 * sz2] = 10 * index + 1 # 20ms/loop
 					dm2 = mask <= self.instance['geometry_diameter'] / 2
 					data[dm2] = 10 * index # 10ms/loop
-					if mask_pass:
-						self.instance['mask_array'][sz2] = True
+					if danger_pass:
+						self.instance['danger_array'][sz2] = index
 		else:
-			self.instance['mask_array'] = None
+			self.instance['danger_array'] = None
 		image[:] = data[:] # 300ms
-		for overlay, staticbitmap in zip(self.instance['mask_overlays'], self.instance['mask_bitmaps']):
-			self.mask_overlay_bitmap(overlay, staticbitmap)
+		for overlay, staticbitmap in zip(self.instance['danger_overlays'], self.instance['danger_bitmaps']):
+			self.danger_overlay_check(overlay, staticbitmap)
 
 	def pair2mask(self, entry_xyz, target_xyz):
 		assert self.instance is not None
@@ -918,9 +924,9 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			'geometry_diameter': instance['diameter'],
 			'geometry_safezone': instance['safezone'],
 			'drawmode': None,
-			'mask_array': None,
-			'mask_overlays': [],
-			'mask_bitmaps': [],
+			'danger_array': None,
+			'danger_overlays': [],
+			'danger_bitmaps': [],
 		}
 		self.start_hide()
 		self.instance_show()
@@ -1214,8 +1220,8 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		if event is not None:
 			self.draw(force=True)
 
-	def on_mask_insert_button_click(self, event):
-		debug('mask append', mode='info')
+	def on_danger_insert_button_click(self, event):
+		debug('danger append', mode='info')
 		assert self.instance is not None
 		overlay = self.displayCtx.getSelectedOverlay()
 		if overlay is None:
@@ -1225,7 +1231,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 				wx.OK|wx.ICON_INFORMATION,
 			)
 			return
-		if overlay in self.instance['mask_overlays']:
+		if overlay in self.instance['danger_overlays']:
 			wx.MessageBox(
 				'The selected overlay is already in the list.',
 				self.title(),
@@ -1253,22 +1259,22 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 				wx.OK|wx.ICON_INFORMATION,
 			)
 			return
-		self.instance['mask_overlays'].append(overlay)
-		self.mask_sizer_refresh()
+		self.instance['danger_overlays'].append(overlay)
+		self.danger_sizer_refresh()
 		self.layout()
 
-	def on_mask_remove_button_click(self, event, overlay):
-		debug('mask remove', overlay.name, mode='info')
+	def on_danger_remove_button_click(self, event, overlay):
+		debug('danger remove', overlay.name, mode='info')
 		assert self.instance is not None
-		assert overlay in self.instance['mask_overlays']
-		self.instance['mask_overlays'].remove(overlay)
-		self.mask_sizer_refresh()
+		assert overlay in self.instance['danger_overlays']
+		self.instance['danger_overlays'].remove(overlay)
+		self.danger_sizer_refresh()
 		self.layout()
 
-	def on_mask_select_button_click(self, event, overlay):
-		debug('mask select', overlay.name, mode='info')
+	def on_danger_select_button_click(self, event, overlay):
+		debug('danger select', overlay.name, mode='info')
 		assert self.instance is not None
-		assert overlay in self.instance['mask_overlays']
+		assert overlay in self.instance['danger_overlays']
 		overlay = self.displayCtx.selectOverlay(overlay)
 
 	def world2voxel(self, coords):
@@ -1301,13 +1307,13 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 			self.reset()
 			return
 		refresh = False
-		for overlay in self.instance['mask_overlays']:
+		for overlay in self.instance['danger_overlays']:
 			if overlay not in self.overlayList:
-				debug('mask has been removed from overlay list', mode='warning')
-				self.instance['mask_overlays'].remove(overlay)
+				debug('danger mask has been removed from overlay list', mode='warning')
+				self.instance['danger_overlays'].remove(overlay)
 				refresh = True
 		if refresh:
-			self.mask_sizer_refresh()
+			self.danger_sizer_refresh()
 			self.layout()
 
 	@staticmethod
