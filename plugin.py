@@ -166,7 +166,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 
 	@staticmethod
 	def title():
-		return 'Ablation'
+		return 'Ablation Surgery Planning'
 
 	def __init__(self, *args, **kwargs):
 		debug('creating panel', mode='info')
@@ -183,7 +183,7 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		self.SetSizer(home_sizer)
 		# main window
 		self.window = wx.lib.scrolledpanel.ScrolledPanel(self)
-		self.window.SetupScrolling()
+		self.window.SetupScrolling(scroll_x=False, scroll_y=True)
 		home_sizer.Add(self.window, 1, flag=wx.EXPAND)
 		# horizontal sizer
 		horizontal_sizer = wx.BoxSizer(wx.HORIZONTAL)
@@ -232,12 +232,24 @@ class AblationControlPanel(fsleyes.controls.controlpanel.ControlPanel):
 		# link line
 		self.init_items.append(main_sizer.Add(wx.StaticLine(self.window), flag=wx.EXPAND))
 		self.init_items.append(main_sizer.AddSpacer(4))
-		# link ctrl
-		self.init_items.append(main_sizer.Add(wx.adv.HyperlinkCtrl(
+		# link text
+		self.init_items.append(main_sizer.Add(wx.StaticText(
 			self.window,
-			label='GitHub',
-			url='https://github.com/constracti/fsleyes-plugin-ablation',
+			label='Useful Links:',
 		)))
+		# link ctrl
+		hyperlinks = {
+			'GitHub Repository': 'https://github.com/constracti/fsleyes-plugin-ablation',
+			'FSLeyes API Documentation' : 'https://open.win.ox.ac.uk/pages/fsl/fsleyes/fsleyes/apidoc/index.html',
+			'wxPython': 'https://www.wxpython.org/',
+			'Font Awesome': 'https://fontawesome.com/',
+		}
+		for label, url in hyperlinks.items():
+			self.init_items.append(main_sizer.Add(wx.adv.HyperlinkCtrl(
+				self.window,
+				label=label,
+				url=url,
+			)))
 		self.init_items.append(main_sizer.AddSpacer(4))
 
 	def build_main_items(self, main_sizer):
